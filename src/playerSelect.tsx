@@ -13,6 +13,7 @@ const dummyData: { id: string; name: string }[] = Array.from({
 const PlayerSelect = ({ route }: { route: any }) => {
   const navigation = useNavigation();
   const { slotIndex } = route.params;
+  const players = playerStore(state => state.players);
   const selectedPlayer = playerStore(state => state.selectedPlayer);
   const updateSlot = playerStore(state => state.updateSlot);
   const handlePlayerSelect = useCallback((item: any) => {
@@ -37,7 +38,7 @@ const PlayerSelect = ({ route }: { route: any }) => {
       <FlatList
         data={dummyData}
         renderItem={({ item, index }) => {
-          const disabled = item.id === selectedPlayer.id;
+          const disabled = players.some(player => player.id === item.id);
           return (
             <TouchableOpacity
               activeOpacity={0.7}
@@ -50,7 +51,7 @@ const PlayerSelect = ({ route }: { route: any }) => {
               }}
               disabled={disabled}
             >
-              <Text>
+              <Text style={{ color: '#000', fontWeight: 'bold' }}>
                 {`#${index + 1} `}
                 {item.name}
               </Text>
