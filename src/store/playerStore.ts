@@ -7,18 +7,14 @@ interface Player {
 }
 
 interface PlayerStore {
-  selectedPlayer: Player;
   players: Player[];
-  setSelectedPlayer: (player: Player) => void;
   setPlayers: (players: Player[]) => void;
   updateSlot: (slotIndex: number, player: Player) => void;
 }
 
 const playerStore = create<PlayerStore>(set => {
   return {
-    selectedPlayer: {id: '', name: '', price: 0},
     players: [],
-    setSelectedPlayer: (player: any) => set({ selectedPlayer: player }),
     setPlayers: (players: any) => set({ players }),
     updateSlot: (slotIndex: number, player: any) => set(state=> {
       const newPlayers = [...state.players]

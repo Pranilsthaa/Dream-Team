@@ -6,13 +6,12 @@ import { RootStackNavigationProp } from './navigation';
 const width = Dimensions.get('window').width;
 
 const TOTAL_BUDGET = 100;
-const TRANSFER_LIMIT = 5;
+const TRANSFER_LIMIT = 11;
 
 const Home = () => {
   const cardWidth = (width - 80) / 4;
   const navigation = useNavigation<RootStackNavigationProp>();
   const players = playerStore(state => state.players);
-  const setSelectedPlayer = playerStore(state => state.setSelectedPlayer);
   const setPlayers = playerStore(state => state.setPlayers);
   const [oldPlayers, setOldPlayers] = useState(new Set());
 
@@ -24,7 +23,6 @@ const Home = () => {
   }, []);
 
   const handleNavigation = useCallback((item: any, index: number) => {
-    setSelectedPlayer(item);
     navigation.navigate('player_select', { slotIndex: index });
   }, []);
 

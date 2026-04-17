@@ -15,7 +15,6 @@ const PlayerSelect = ({ route }: { route: any }) => {
   const navigation = useNavigation();
   const { slotIndex } = route.params;
   const players = playerStore(state => state.players);
-  const selectedPlayer = playerStore(state => state.selectedPlayer);
   const updateSlot = playerStore(state => state.updateSlot);
   const handlePlayerSelect = useCallback((item: any) => {
     updateSlot(slotIndex, item);
@@ -23,7 +22,7 @@ const PlayerSelect = ({ route }: { route: any }) => {
   }, []);
   return (
     <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 16 }}>
-      {selectedPlayer.id ? (
+      {players[slotIndex].id ? (
         <View
           style={{
             backgroundColor: 'gray',
@@ -33,7 +32,7 @@ const PlayerSelect = ({ route }: { route: any }) => {
           }}
         >
           <Text>Outgoing Player</Text>
-          <Text>{selectedPlayer.name}</Text>
+          <Text>{players[slotIndex].name}</Text>
         </View>
       ) : null}
       <FlatList
