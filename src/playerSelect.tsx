@@ -3,11 +3,12 @@ import React, { useCallback } from 'react';
 import playerStore from './store/playerStore';
 import { useNavigation } from '@react-navigation/native';
 
-const dummyData: { id: string; name: string }[] = Array.from({
+const dummyData: { id: string; name: string; price: number }[] = Array.from({
   length: 30,
 }).map((_, index) => ({
   id: String(index),
   name: `Player ${index}`,
+  price: Number(((index + 1) * 1.25).toFixed()),
 }));
 
 const PlayerSelect = ({ route }: { route: any }) => {
@@ -55,6 +56,7 @@ const PlayerSelect = ({ route }: { route: any }) => {
                 {`#${index + 1} `}
                 {item.name}
               </Text>
+              <Text style={{ color: '#000' }}>NRs. {item.price}</Text>
             </TouchableOpacity>
           );
         }}

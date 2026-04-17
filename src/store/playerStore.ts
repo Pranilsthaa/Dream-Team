@@ -3,6 +3,7 @@ import { create } from 'zustand';
 interface Player {
   id: string;
   name: string;
+  price: number
 }
 
 interface PlayerStore {
@@ -15,7 +16,7 @@ interface PlayerStore {
 
 const playerStore = create<PlayerStore>(set => {
   return {
-    selectedPlayer: {id: '', name: ''},
+    selectedPlayer: {id: '', name: '', price: 0},
     players: [],
     setSelectedPlayer: (player: any) => set({ selectedPlayer: player }),
     setPlayers: (players: any) => set({ players }),

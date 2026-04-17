@@ -5,6 +5,8 @@ import playerStore from './store/playerStore';
 import { RootStackNavigationProp } from './navigation';
 const width = Dimensions.get('window').width;
 
+const TOTAL_BUDGET = 100;
+
 const Home = () => {
   const cardWidth = (width - 80) / 4;
   const navigation = useNavigation<RootStackNavigationProp>();
@@ -20,14 +22,26 @@ const Home = () => {
     setSelectedPlayer(item);
     navigation.navigate('player_select', { slotIndex: index });
   }, []);
+
+  const budget_rem =
+    TOTAL_BUDGET -
+    players.reduce((acc, player) => acc + (player.price ?? 0), 0);
   return (
     <View style={{ flex: 1, padding: 16 }}>
+      <Text style={{ color: '#fff' }}>
+        Budget:
+        <Text style={{ color: budget_rem < 0 ? 'red' : 'green' }}>
+          {budget_rem}
+        </Text>
+      </Text>
+
       <View
         style={{
           flexDirection: 'row',
           flexWrap: 'wrap',
           justifyContent: 'center',
           gap: 16,
+          marginTop: 16,
         }}
       >
         {players &&
@@ -45,7 +59,12 @@ const Home = () => {
               }}
             >
               <Text>{index}</Text>
-              {item.id ? <Text>{item.name}</Text> : null}
+              {item.id ? (
+                <>
+                  <Text>{item.name}</Text>
+                  <Text>NRs. {item.price}</Text>
+                </>
+              ) : null}
             </TouchableOpacity>
           ))}
       </View>
