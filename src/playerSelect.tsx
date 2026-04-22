@@ -1,24 +1,64 @@
 import { View, Text, FlatList, TouchableOpacity } from 'react-native';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import playerStore from './store/playerStore';
 import { useNavigation } from '@react-navigation/native';
+import axios from 'axios';
+import Config from 'react-native-config';
 
-const dummyData: { id: string; name: string; price: number }[] = Array.from({
-  length: 30,
-}).map((_, index) => ({
-  id: String(index),
-  name: `Player ${index}`,
-  price: Number(((index + 1) * 1.25).toFixed()),
-}));
+type TPlayerItem = {
+  id: string;
+  name: string;
+  age: string;
+  price: number;
+  role: string;
+  isActive: boolean;
+  team: {
+    name: string;
+    logo: string;
+    code: string;
+  };
+};
+
+type TplayerResponse = {
+  success: boolean;
+  message: string;
+  data: TPlayerItem[];
+};
+
+// const dummyData: { id: string; name: string; price: number }[] = Array.from({
+//   length: 30,
+// }).map((_, index) => ({
+//   id: String(index),
+//   name: `Player ${index}`,
+//   price: Number(((index + 1) * 1.25).toFixed()),
+// }));
 
 const PlayerSelect = ({ route }: { route: any }) => {
   const navigation = useNavigation();
+  const [playersData, setPlayersData] = useState<TPlayerItem[]>([]);
+
   const { slotIndex } = route.params;
   const players = playerStore(state => state.players);
   const updateSlot = playerStore(state => state.updateSlot);
+
   const handlePlayerSelect = useCallback((item: any) => {
     updateSlot(slotIndex, item);
     navigation.goBack();
+  }, []);
+
+  const fetchPlayers = async () => {
+    const BASE_URL = Config.BASE_URL;
+    try {
+      const players = await axios.get<TplayerResponse>(
+        `${BASE_URL}/api/players`,
+      );
+      setPlayersData(players.data.data);
+    } catch (e) {
+      console.log(e);
+    }
+  };
+  useEffect(() => {
+    fetchPlayers();
   }, []);
   return (
     <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 16 }}>
@@ -36,7 +76,7 @@ const PlayerSelect = ({ route }: { route: any }) => {
         </View>
       ) : null}
       <FlatList
-        data={dummyData}
+        data={playersData}
         renderItem={({ item, index }) => {
           const disabled = players.some(player => player.id === item.id);
           return (
@@ -53,7 +93,7 @@ const PlayerSelect = ({ route }: { route: any }) => {
             >
               <Text style={{ color: '#000', fontWeight: 'bold' }}>
                 {`#${index + 1} `}
-                {item.name}
+                {item.name} ({item.team.code})
               </Text>
               <Text style={{ color: '#000' }}>NRs. {item.price}</Text>
             </TouchableOpacity>

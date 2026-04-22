@@ -6,9 +6,11 @@ import {
 } from '@react-navigation/native-stack';
 import Home from './home';
 import PlayerSelect from './playerSelect';
+import PlayerTransferScreen from './transfer';
 
 type RootStackParamList = {
   Home: undefined;
+  player_transfer: undefined;
   player_select: { slotIndex: number };
 };
 
@@ -28,6 +30,7 @@ const Navigator = () => {
         }}
       >
         <Stack.Screen name="Home" component={Home} />
+        <Stack.Screen name="player_transfer" component={PlayerTransferScreen} />
         <Stack.Screen name="player_select" component={PlayerSelect} />
       </Stack.Navigator>
     </NavigationContainer>
