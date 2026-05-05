@@ -2,8 +2,7 @@ import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import playerStore from './store/playerStore';
 import { useNavigation } from '@react-navigation/native';
-import axios from 'axios';
-import Config from 'react-native-config';
+import apiInstance from './api/apiClient';
 
 type TPlayerItem = {
   id: string;
@@ -47,11 +46,8 @@ const PlayerSelect = ({ route }: { route: any }) => {
   }, []);
 
   const fetchPlayers = async () => {
-    const BASE_URL = Config.BASE_URL;
     try {
-      const players = await axios.get<TplayerResponse>(
-        `${BASE_URL}/api/players`,
-      );
+      const players = await apiInstance.get<TplayerResponse>('/api/players');
       setPlayersData(players.data.data);
     } catch (e) {
       console.log(e);

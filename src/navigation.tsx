@@ -26,7 +26,7 @@ const Navigator = () => {
         screenOptions={{
           contentStyle: { backgroundColor: 'rgba(65, 64, 64, 1)' },
           headerShown: false,
-          animation: 'fade',
+          animation: 'none',
         }}
       >
         <Stack.Screen name="Home" component={Home} />
