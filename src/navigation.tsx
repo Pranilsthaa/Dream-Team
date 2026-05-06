@@ -5,7 +5,7 @@ import {
   NativeStackNavigationProp,
 } from '@react-navigation/native-stack';
 import Home from './home';
-import PlayerSelect from './playerSelect';
+import PlayerSelect from './playerSelectScreen';
 import PlayerTransferScreen from './transfer';
 
 type RootStackParamList = {
