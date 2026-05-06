@@ -1,8 +1,7 @@
 import { View, Text, Dimensions, TouchableOpacity } from 'react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
-import playerStore from './store/playerStore';
-import { RootStackNavigationProp } from './navigation';
+import playerStore from '../../store/playerStore';
 const width = Dimensions.get('window').width;
 
 const TOTAL_BUDGET = 100;
@@ -10,7 +9,7 @@ const TRANSFER_LIMIT = 11;
 
 const PlayerTransferScreen = () => {
   const cardWidth = (width - 80) / 4;
-  const navigation = useNavigation<RootStackNavigationProp>();
+  const navigation = useNavigation() as any;
   const players = playerStore(state => state.players);
   const setPlayers = playerStore(state => state.setPlayers);
   const [oldPlayers, setOldPlayers] = useState(new Set());

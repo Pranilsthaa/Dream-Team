@@ -5,9 +5,8 @@
  * @format
  */
 
-import { StatusBar, StyleSheet, useColorScheme } from 'react-native';
+import { StatusBar, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import Navigator from './src/navigation';
 import RootNavigator from '@/navigation/RootNavigator';
 
 function App() {
