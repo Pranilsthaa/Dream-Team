@@ -9,8 +9,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   Animated,
+  InteractionManager,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { RoleTabBar } from '@/components/PlayerSelect/RoleTabBar';
 import { SquadTray } from '@/components/PlayerSelect/SquadTray';
@@ -59,8 +60,29 @@ const PlayerSelectScreen = ({ route }: { route: any }) => {
   const [allPlayers, setAllPlayers] = useState<TPlayerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   const { bottom } = useSafeAreaInsets();
+
+  useEffect(() => {
+    // Fetch players
+    const fetchPlayers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await apiInstance.get<TPlayerResponse>('/api/players');
+        setAllPlayers(res.data.data);
+      } catch (e: any) {
+        setError(e?.message ?? 'Failed to load players. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    setTimeout(() => {
+      fetchPlayers();
+      setIsReady(true);
+    }, 400);
+  }, []);
 
   // All logic lives in the hook
   const {
@@ -88,23 +110,6 @@ const PlayerSelectScreen = ({ route }: { route: any }) => {
       friction: 10,
     }).start();
   }, [toast]);
-
-  // Fetch players
-  useEffect(() => {
-    const fetchPlayers = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await apiInstance.get<TPlayerResponse>('/api/players');
-        setAllPlayers(res.data.data);
-      } catch (e: any) {
-        setError(e?.message ?? 'Failed to load players. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPlayers();
-  }, []);
 
   const handleConfirm = useCallback(() => {
     if (!isSquadComplete(selected)) return;

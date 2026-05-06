@@ -1,6 +1,4 @@
-import { View, Text } from 'react-native';
 import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AppNavigator from './AppNavigator';
 import AuthNavigator from './AuthNavigator';
@@ -14,7 +12,9 @@ const RootNavigator = () => {
   const auth = true;
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        screenOptions={{ headerShown: false, animation: 'default' }}
+      >
         {auth ? (
           <>
             <Stack.Screen name="App" component={AppNavigator} />
