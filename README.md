@@ -2,7 +2,7 @@
 
 A fantasy league platform for any sport or game. Creators define player pools and scoring rules; members build squads and compete in invite-only leagues.
 
-This repository currently contains the frontend foundation for an Expo SDK 58 app. The root route displays a temporary theme preview for checkpoint review. Login/sign-up is the next checkpoint; no authentication service is connected.
+This Expo SDK 58 app currently opens to the login/sign-up screen. It includes form validation, password visibility, a sport-neutral squad illustration, and Reanimated feedback. Authentication and Google sign-in show availability messages; no credentials are sent or stored persistently.
 
 ## Development
 
@@ -18,7 +18,7 @@ Use `bun run ios`, `bun run android`, or `bun run web` for the relevant target.
 ```sh
 bun run lint
 bun run typecheck
-bunx expo export --platform web
+bunx expo export --platform all
 ```
 
 Shared visual tokens live in `src/constants/theme.ts`. Routes live in `src/app/`, screen bodies in `src/screens/`, and locally bundled fonts in `assets/fonts/`.

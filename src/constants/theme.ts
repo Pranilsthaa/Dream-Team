@@ -1,4 +1,4 @@
-/** Shared visual language, extracted from the supplied Fantasy Forge HTML. */
+/** Shared color, typography, spacing, and motion tokens. */
 export const theme = {
   colors: {
     background: '#14291E',

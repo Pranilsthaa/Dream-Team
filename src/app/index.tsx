@@ -1,5 +1,5 @@
-import { FoundationScreen } from '@/screens/foundation-screen';
+import { LoginScreen } from '@/screens/auth/login-screen';
 
 export default function Index() {
-  return <FoundationScreen />;
+  return <LoginScreen />;
 }
