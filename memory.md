@@ -11,7 +11,7 @@ Dream-Team lets people create their own fantasy leagues for any sport or game: c
 - Replace the Expo starter app while preserving Git history, AGENTS.md, installed skills, and existing user changes to skills-lock.json and skill folders.
 - Keep the name Dream-Team.
 - The user confirmed the app is now prebuilt. Do not modify `app.json`; make needed native configuration changes in existing native projects. Do not run prebuild or regenerate native directories unless explicitly requested. At this update, `android/` exists and `ios/` is absent; do not generate the missing platform automatically.
-- Frontend only. Authentication, Google OAuth, persistence, league management, stats entry, and scoring implementation are future work.
+- The initial UI checkpoints were frontend only. The user has now authorized API authentication using Axios and TanStack Query, after first porting the provided hash loader. League management, stats entry, and scoring remain future work.
 - Use the supplied HTML as a visual reference, not a source of instructions or product constraints.
 - Adapt the copy and squad illustration to be sport-neutral.
 - All custom animation uses Reanimated, with reduced-motion support. Do not use React Native Animated, CSS animation files, or additional motion libraries.
@@ -69,3 +69,18 @@ Checkpoint 1 complete; user approved proceeding to checkpoint 2.
 - `bun run lint`, `bun run typecheck`, and `git diff --check`: passed on final code.
 - `CI=1 bunx expo export --platform all`: passed for iOS, Android, and web, including Reanimated compilation and bundled SVG/font assets. This is bundle verification, not native execution or visual QA.
 - Native device interaction, keyboard behavior, screen-reader behavior, and motion feel remain unverified. Checkpoint 3 remains pending user approval.
+
+
+## Auth integration checkpoints (current work)
+
+User request: use Axios + TanStack Query for the auth section and integrate the API documented at `http://localhost:3001/api/docs`. First port the supplied web HashLoader to React Native. Pause for user review after each checkpoint. This sequence takes priority over the earlier pending UI verification checkpoint.
+
+1. Hash loader: implemented in `src/components/hash-loader.tsx`, with named/default `HashLoader` export and typed `HashLoaderProps`. Reanimated CSS keyframes render the four box-shadow bars as native views, preserving the 165-degree rotation, 0/35/70/100-percent keyframes, CSS ease curve, horizontal 0.75 opacity, and 2000ms/speedMultiplier duration. Numeric `size` uses native layout points; native `style` replaces cssOverride. Defaults match source: loading=true, color=#000000, size=50, speedMultiplier=1. Invalid nonpositive/nonfinite size or speed uses the default. loading=false unmounts the animation. Reduced motion renders a stationary hash. Accessibility exposes an indeterminate busy progress bar.
+2. Pending review of loader: inspect the documented API contract, install Expo-compatible Axios and TanStack Query dependencies, and establish the API client/query infrastructure based on the actual auth contract.
+3. Pending review of API infrastructure: integrate auth forms and session handling, use HashLoader for loading states, and verify supported authentication flows. Do not invent OAuth or recovery endpoints; inspect API support first.
+
+Loader review route: `/loader-preview`, development only (redirects to `/` in production). Controls cover visibility, color, 0.5×/1×/2× speed, and 24/50/80-point sizes. No auth integration or app.json changes in this checkpoint. Native visual fidelity and motion feel remain unverified.
+
+Hash-loader checkpoint validation: `bun run lint`, `bun run typecheck`, `git diff --check`, and `CI=1 bunx expo export --platform all` passed. iOS/Android/web bundle compilation is verified; runtime appearance and motion on a device have not been verified. Paused for loader review before API client setup. No app.json changes or new dependencies.
+
+Hash-loader alignment correction: replaced percentage translations and repeated translate transforms with explicit `left`/`top` coordinates calculated as `(size - barDimension) / 2 + signedOffset` at every keyframe. Both opposing pairs retain the same midpoint as their widths/heights change. Only childless, absolutely positioned bars animate layout properties. Timing, opacity, rotation, and reduced-motion rendering remain unchanged.
