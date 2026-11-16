@@ -1,20 +1,19 @@
 import { useRef, useState, type ComponentRef } from "react";
 import {
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ActionButton } from "@/components/action-button";
 import { theme } from "@/constants/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuthField } from "./auth-field";
 import { SquadPreview } from "./squad-preview";
 
@@ -33,12 +32,13 @@ export function LoginScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [notice, setNotice] = useState("");
-  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const teamRef = useRef<ComponentRef<typeof TextInput>>(null);
   const identityRef = useRef<ComponentRef<typeof TextInput>>(null);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
   const reducedMotion = useReducedMotion();
   const signup = mode === "signup";
+
+  const { bottom } = useSafeAreaInsets();
 
   function changeMode(nextMode: Mode) {
     if (nextMode === mode) return;
@@ -99,199 +99,192 @@ export function LoginScreen() {
     Keyboard.dismiss();
     setNotice("Password reset is coming soon. No reset message has been sent.");
   }
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
+    <View style={[styles.safeArea, { marginBottom: bottom }]}>
+      <StatusBar hidden />
+      <KeyboardAwareScrollView
         style={styles.keyboard}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        bottomOffset={100}
       >
-        <ScrollView
-          ref={scrollRef}
-          onContentSizeChange={() => {
-            if (notice) scrollRef.current?.scrollToEnd({ animated: false });
-          }}
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-        >
-          <View style={styles.page}>
-            <SquadPreview />
-            <View style={styles.main}>
-              <View style={styles.intro}>
-                <Text accessibilityRole="header" style={styles.heading}>
-                  Your game.{"\n"}Your league.
-                </Text>
-                <Text style={styles.subtitle}>
-                  Pick your squad, name a captain, and climb the leaderboard.
-                </Text>
-              </View>
-
-              <View accessibilityRole="tablist" style={styles.tabs}>
-                {(["login", "signup"] as const).map((tab) => (
-                  <Pressable
-                    key={tab}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: mode === tab }}
-                    onPress={() => changeMode(tab)}
-                    style={({ pressed }) => [
-                      styles.tab,
-                      mode === tab && styles.selectedTab,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.tabText,
-                        mode === tab && styles.selectedTabText,
-                      ]}
-                    >
-                      {tab === "login" ? "Log in" : "Sign up"}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <View style={styles.form}>
-                {signup ? (
-                  <AuthField
-                    ref={teamRef}
-                    nativeID="team-name"
-                    label="Team name"
-                    placeholder="Underdog United"
-                    value={team}
-                    error={errors.team}
-                    onChangeText={(value) => update("team", value)}
-                    autoComplete="off"
-                    autoCapitalize="words"
-                    maxLength={60}
-                    returnKeyType="next"
-                    submitBehavior="submit"
-                    onSubmitEditing={() => identityRef.current?.focus()}
-                  />
-                ) : null}
-                <AuthField
-                  ref={identityRef}
-                  nativeID="identity"
-                  label="Email or phone"
-                  placeholder="you@example.com"
-                  value={identity}
-                  error={errors.identity}
-                  onChangeText={(value) => update("identity", value)}
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  returnKeyType="next"
-                  submitBehavior="submit"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                />
-                <AuthField
-                  ref={passwordRef}
-                  nativeID="password"
-                  label="Password"
-                  placeholder="At least 6 characters"
-                  value={password}
-                  error={errors.password}
-                  onChangeText={(value) => update("password", value)}
-                  secureTextEntry={!passwordVisible}
-                  autoComplete={signup ? "new-password" : "current-password"}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="go"
-                  onSubmitEditing={submit}
-                  trailing={
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={
-                        passwordVisible ? "Hide password" : "Show password"
-                      }
-                      accessibilityState={{ checked: passwordVisible }}
-                      onPress={() => setPasswordVisible((visible) => !visible)}
-                      style={({ pressed }) => [
-                        styles.peek,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Text style={styles.peekText}>
-                        {passwordVisible ? "Hide" : "Show"}
-                      </Text>
-                    </Pressable>
-                  }
-                />
-                {!signup ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={forgotPassword}
-                    style={({ pressed }) => [
-                      styles.forgot,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text style={styles.forgotText}>Forgot password?</Text>
-                  </Pressable>
-                ) : null}
-                <View style={signup ? styles.signupAction : undefined}>
-                  <ActionButton onPress={submit}>
-                    {signup ? "Create my team" : "Enter the game"}
-                  </ActionButton>
-                </View>
-                {notice ? (
-                  <Animated.View
-                    entering={reducedMotion ? undefined : noticeEntrance}
-                    style={styles.notice}
-                  >
-                    <Text
-                      accessibilityRole="alert"
-                      accessibilityLiveRegion="polite"
-                      style={styles.noticeText}
-                    >
-                      {notice}
-                    </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Dismiss message"
-                      onPress={() => setNotice("")}
-                      style={({ pressed }) => [
-                        styles.dismiss,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Text style={styles.dismissText}>×</Text>
-                    </Pressable>
-                  </Animated.View>
-                ) : null}
-              </View>
-
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.or}>or</Text>
-                <View style={styles.dividerLine} />
-              </View>
-              <ActionButton
-                variant="secondary"
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setNotice(
-                    "Google sign-in is coming soon. Please check back later.",
-                  );
-                }}
-                icon={
-                  <Text accessible={false} style={styles.googleIcon}>
-                    G
-                  </Text>
-                }
-              >
-                Continue with Google
-              </ActionButton>
-              <Text style={styles.footer}>
-                Every sport. Every game. Your kind of league.
+        <View style={styles.page}>
+          <SquadPreview />
+          <View style={styles.main}>
+            <View style={styles.intro}>
+              <Text accessibilityRole="header" style={styles.heading}>
+                Your game.{"\n"}Your league.
+              </Text>
+              <Text style={styles.subtitle}>
+                Pick your squad, name a captain, and climb the leaderboard.
               </Text>
             </View>
+
+            <View accessibilityRole="tablist" style={styles.tabs}>
+              {(["login", "signup"] as const).map((tab) => (
+                <Pressable
+                  key={tab}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: mode === tab }}
+                  onPress={() => changeMode(tab)}
+                  style={({ pressed }) => [
+                    styles.tab,
+                    mode === tab && styles.selectedTab,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      mode === tab && styles.selectedTabText,
+                    ]}
+                  >
+                    {tab === "login" ? "Log in" : "Sign up"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.form}>
+              {signup ? (
+                <AuthField
+                  ref={teamRef}
+                  nativeID="team-name"
+                  label="Team name"
+                  placeholder="Underdog United"
+                  value={team}
+                  error={errors.team}
+                  onChangeText={(value) => update("team", value)}
+                  autoComplete="off"
+                  autoCapitalize="words"
+                  maxLength={60}
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => identityRef.current?.focus()}
+                />
+              ) : null}
+              <AuthField
+                ref={identityRef}
+                nativeID="identity"
+                label="Email or phone"
+                placeholder="you@example.com"
+                value={identity}
+                error={errors.identity}
+                onChangeText={(value) => update("identity", value)}
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+              />
+              <AuthField
+                ref={passwordRef}
+                nativeID="password"
+                label="Password"
+                placeholder="At least 6 characters"
+                value={password}
+                error={errors.password}
+                onChangeText={(value) => update("password", value)}
+                secureTextEntry={!passwordVisible}
+                autoComplete={signup ? "new-password" : "current-password"}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="go"
+                onSubmitEditing={submit}
+                trailing={
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      passwordVisible ? "Hide password" : "Show password"
+                    }
+                    accessibilityState={{ checked: passwordVisible }}
+                    onPress={() => setPasswordVisible((visible) => !visible)}
+                    style={({ pressed }) => [
+                      styles.peek,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={styles.peekText}>
+                      {passwordVisible ? "Hide" : "Show"}
+                    </Text>
+                  </Pressable>
+                }
+              />
+              {!signup ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={forgotPassword}
+                  style={({ pressed }) => [
+                    styles.forgot,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.forgotText}>Forgot password?</Text>
+                </Pressable>
+              ) : null}
+              <View style={signup ? styles.signupAction : undefined}>
+                <ActionButton onPress={submit}>
+                  {signup ? "Create my team" : "Enter the game"}
+                </ActionButton>
+              </View>
+              {notice ? (
+                <Animated.View
+                  entering={reducedMotion ? undefined : noticeEntrance}
+                  style={styles.notice}
+                >
+                  <Text
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="polite"
+                    style={styles.noticeText}
+                  >
+                    {notice}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Dismiss message"
+                    onPress={() => setNotice("")}
+                    style={({ pressed }) => [
+                      styles.dismiss,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={styles.dismissText}>×</Text>
+                  </Pressable>
+                </Animated.View>
+              ) : null}
+            </View>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.or}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+            <ActionButton
+              variant="secondary"
+              onPress={() => {
+                Keyboard.dismiss();
+                setNotice(
+                  "Google sign-in is coming soon. Please check back later.",
+                );
+              }}
+              icon={
+                <Text accessible={false} style={styles.googleIcon}>
+                  G
+                </Text>
+              }
+            >
+              Continue with Google
+            </ActionButton>
+            <Text style={styles.footer}>
+              Every sport. Every game. Your kind of league.
+            </Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </View>
+      </KeyboardAwareScrollView>
+    </View>
   );
 }
 

@@ -4,11 +4,12 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
 
-void SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -18,7 +19,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (loaded || error) void SplashScreen.hideAsync();
+    if (loaded || error) SplashScreen.hideAsync();
   }, [loaded, error]);
 
   if (!loaded && !error) return null;
@@ -29,13 +30,15 @@ export default function RootLayout() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
     >
       <SafeAreaProvider>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: theme.colors.background },
-          }}
-        />
+        <KeyboardProvider>
+          <StatusBar style="light" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+        </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
