@@ -8,6 +8,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
+import { QueryProvider } from "@/providers/query-provider";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,13 +32,15 @@ export default function RootLayout() {
     >
       <SafeAreaProvider>
         <KeyboardProvider>
-          <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
+          <QueryProvider>
+            <StatusBar style="light" />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: theme.colors.background },
+              }}
+            />
+          </QueryProvider>
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

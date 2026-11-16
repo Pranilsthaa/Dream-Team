@@ -34,4 +34,19 @@ import { HashLoader } from '@/components/hash-loader';
 <HashLoader loading={isPending} color="#C4F27D" size={32} speedMultiplier={1} />
 ```
 
-`size` is a number in native layout points; pass native layout overrides through `style`. Reduced motion displays a stationary hash. In development, open `/loader-preview` to review sizes and toggle visibility, color, and animation speed.
+`size` is a number in native layout points; pass native layout overrides through `style`. Reduced motion displays a stationary hash.
+
+
+## API client
+
+Axios handles requests; TanStack Query is provided at the root layout. The typed auth service in `src/features/auth/api.ts` follows the local Swagger contract for register, login, refresh, logout, and profile. Form wiring and secure session handling are the next checkpoint; the login screen still shows availability messages.
+
+Copy `.env.example` to `.env.local` to configure `EXPO_PUBLIC_API_URL`, including the `/api` suffix. Development defaults to `http://localhost:3001/api`. Production requires an explicit URL. Reload the app after changing environment variables.
+
+- Web/iOS simulator: `http://localhost:3001/api`.
+- Android emulator: `http://10.0.2.2:3001/api`, or forward localhost using `adb -s <serial> reverse tcp:3001 tcp:3001`.
+- Physical device: use the computer's LAN address with the API listening on that interface, or USB forwarding on Android.
+
+Requests time out after 15 seconds. Errors retain HTTP status, validation messages, and Retry-After seconds without retaining Axios request configuration or credentials. Queries retry transient failures once; mutations do not retry automatically. Refresh calls must be serialized by the upcoming session layer, which must retain the replacement refresh credential.
+
+The API supports email login and username registration (3–30 lowercase letters, numbers, or underscores), with registration passwords of 12–128 characters. It does not document phone login, Google sign-in, password reset, or a team-name field.
