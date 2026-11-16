@@ -1,4 +1,4 @@
-import { useRef, useState, type ComponentRef } from "react";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
 import {
   Keyboard,
   Pressable,
@@ -13,26 +13,41 @@ import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
 import { ActionButton } from "@/components/action-button";
 import { theme } from "@/constants/theme";
+import { useSignInMutation } from "@/features/auth/hooks";
+import { ApiError } from "@/lib/api/api-error";
+import { useAuth } from "@/providers/auth-provider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuthField } from "./auth-field";
 import { SquadPreview } from "./squad-preview";
 
 type Mode = "login" | "signup";
-type Field = "team" | "identity" | "password";
+type Field = "username" | "identity" | "password";
 type Errors = Partial<Record<Field, string>>;
 const noticeEntrance = FadeIn.duration(160);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const phonePattern = /^\+?[\d\s().-]+$/;
 
 export function LoginScreen() {
   const [mode, setMode] = useState<Mode>("login");
-  const [team, setTeam] = useState("");
+  const [username, setUsername] = useState("");
   const [identity, setIdentity] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
-  const [notice, setNotice] = useState("");
-  const teamRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const { session } = useAuth();
+  const mutation = useSignInMutation();
+  const [notice, setNotice] = useState(session.message ?? "");
+  const [retryUntil, setRetryUntil] = useState(0);
+  const [clock, setClock] = useState(Date.now);
+  const cooldown = Math.max(0, Math.ceil((retryUntil - clock) / 1000));
+  const requestInFlight = useRef(false);
+  const busy = mutation.isPending;
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setClock(Date.now()), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown, retryUntil]);
+  const usernameRef = useRef<ComponentRef<typeof TextInput>>(null);
   const identityRef = useRef<ComponentRef<typeof TextInput>>(null);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
   const reducedMotion = useReducedMotion();
@@ -41,7 +56,7 @@ export function LoginScreen() {
   const { bottom } = useSafeAreaInsets();
 
   function changeMode(nextMode: Mode) {
-    if (nextMode === mode) return;
+    if (nextMode === mode || busy) return;
     setMode(nextMode);
     setErrors({});
     setNotice("");
@@ -49,7 +64,7 @@ export function LoginScreen() {
   }
 
   function update(field: Field, value: string) {
-    if (field === "team") setTeam(value);
+    if (field === "username") setUsername(value);
     if (field === "identity") setIdentity(value);
     if (field === "password") setPassword(value);
     setErrors((current) => ({ ...current, [field]: undefined }));
@@ -58,34 +73,47 @@ export function LoginScreen() {
 
   function validateIdentity() {
     const value = identity.trim();
-    const digits = value.replace(/\D/g, "");
-    if (!value) return "Enter your email or phone number.";
-    if (
-      !emailPattern.test(value) &&
-      !(phonePattern.test(value) && digits.length >= 7 && digits.length <= 15)
-    ) {
-      return "Enter a valid email or phone number.";
-    }
+    if (!value) return "Enter your email address.";
+    if (!emailPattern.test(value) || value.length > 254) return "Enter a valid email address.";
     return undefined;
   }
 
-  function submit() {
+  async function submit() {
+    if (requestInFlight.current || cooldown > 0) return;
+    const normalizedUsername = username.trim().toLowerCase();
     const nextErrors: Errors = {
-      team: signup && !team.trim() ? "Give your team a name." : undefined,
+      username: signup && !/^[a-z0-9_]{3,30}$/.test(normalizedUsername)
+        ? "Use 3–30 letters, numbers, or underscores." : undefined,
       identity: validateIdentity(),
-      password: password.length < 6 ? "Use at least 6 characters." : undefined,
+      password: password.length < (signup ? 12 : 1) || password.length > 128
+        ? signup ? "Use a passphrase of 12–128 characters." : "Enter your password (up to 128 characters)."
+        : undefined,
     };
     setErrors(nextErrors);
     setNotice("");
-    if (nextErrors.team) return teamRef.current?.focus();
+    if (nextErrors.username) return usernameRef.current?.focus();
     if (nextErrors.identity) return identityRef.current?.focus();
     if (nextErrors.password) return passwordRef.current?.focus();
+    requestInFlight.current = true;
     Keyboard.dismiss();
-    setNotice(
-      signup
-        ? "Account creation is coming soon. Your details haven’t been sent."
-        : "Sign-in is coming soon. Your details haven’t been sent.",
-    );
+    try {
+      await mutation.mutateAsync(signup
+        ? { mode: "signup", input: { username: normalizedUsername, email: identity, password } }
+        : { mode: "login", input: { email: identity, password } });
+      setPassword("");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 429) {
+        const now = Date.now();
+        setClock(now);
+        setRetryUntil(now + (error.retryAfterSeconds ?? 60) * 1000);
+      }
+      setNotice(error instanceof ApiError && error.status === 401
+        ? "The email or password is incorrect. Please try again."
+        : error instanceof Error ? error.message : "Could not sign in. Please try again.");
+    } finally {
+      requestInFlight.current = false;
+      mutation.reset();
+    }
   }
 
   function forgotPassword() {
@@ -125,8 +153,9 @@ export function LoginScreen() {
               {(["login", "signup"] as const).map((tab) => (
                 <Pressable
                   key={tab}
+                  disabled={busy}
                   accessibilityRole="tab"
-                  accessibilityState={{ selected: mode === tab }}
+                  accessibilityState={{ selected: mode === tab, disabled: busy }}
                   onPress={() => changeMode(tab)}
                   style={({ pressed }) => [
                     styles.tab,
@@ -149,16 +178,18 @@ export function LoginScreen() {
             <View style={styles.form}>
               {signup ? (
                 <AuthField
-                  ref={teamRef}
-                  nativeID="team-name"
-                  label="Team name"
-                  placeholder="Underdog United"
-                  value={team}
-                  error={errors.team}
-                  onChangeText={(value) => update("team", value)}
-                  autoComplete="off"
-                  autoCapitalize="words"
-                  maxLength={60}
+                  ref={usernameRef}
+                  nativeID="username"
+                  label="Username"
+                  placeholder="underdog_united"
+                  value={username}
+                  error={errors.username}
+                  onChangeText={(value) => update("username", value)}
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  maxLength={30}
+                  autoCorrect={false}
+                  editable={!busy}
                   returnKeyType="next"
                   submitBehavior="submit"
                   onSubmitEditing={() => identityRef.current?.focus()}
@@ -167,12 +198,14 @@ export function LoginScreen() {
               <AuthField
                 ref={identityRef}
                 nativeID="identity"
-                label="Email or phone"
+                label="Email"
                 placeholder="you@example.com"
                 value={identity}
+                editable={!busy}
+                maxLength={254}
                 error={errors.identity}
                 onChangeText={(value) => update("identity", value)}
-                autoComplete="username"
+                autoComplete="email"
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
@@ -184,8 +217,10 @@ export function LoginScreen() {
                 ref={passwordRef}
                 nativeID="password"
                 label="Password"
-                placeholder="At least 6 characters"
+                placeholder={signup ? "At least 12 characters" : "Your password"}
                 value={password}
+                editable={!busy}
+                maxLength={128}
                 error={errors.password}
                 onChangeText={(value) => update("password", value)}
                 secureTextEntry={!passwordVisible}
@@ -197,6 +232,7 @@ export function LoginScreen() {
                 trailing={
                   <Pressable
                     accessibilityRole="button"
+                    disabled={busy}
                     accessibilityLabel={
                       passwordVisible ? "Hide password" : "Show password"
                     }
@@ -217,6 +253,7 @@ export function LoginScreen() {
                 <Pressable
                   accessibilityRole="button"
                   onPress={forgotPassword}
+                  disabled={busy}
                   style={({ pressed }) => [
                     styles.forgot,
                     pressed && styles.pressed,
@@ -226,8 +263,9 @@ export function LoginScreen() {
                 </Pressable>
               ) : null}
               <View style={signup ? styles.signupAction : undefined}>
-                <ActionButton onPress={submit}>
-                  {signup ? "Create my team" : "Enter the game"}
+                <ActionButton onPress={submit} loading={busy} disabled={cooldown > 0}>
+                  {busy ? signup ? "Creating account…" : "Signing in…"
+                    : cooldown > 0 ? `Try again in ${cooldown}s` : signup ? "Create account" : "Enter the game"}
                 </ActionButton>
               </View>
               {notice ? (
@@ -244,6 +282,7 @@ export function LoginScreen() {
                   </Text>
                   <Pressable
                     accessibilityRole="button"
+                    disabled={busy}
                     accessibilityLabel="Dismiss message"
                     onPress={() => setNotice("")}
                     style={({ pressed }) => [
@@ -264,6 +303,7 @@ export function LoginScreen() {
             </View>
             <ActionButton
               variant="secondary"
+              disabled={busy}
               onPress={() => {
                 Keyboard.dismiss();
                 setNotice(

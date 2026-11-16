@@ -2,7 +2,7 @@
 
 A fantasy league platform for any sport or game. Creators define player pools and scoring rules; members build squads and compete in invite-only leagues.
 
-This Expo SDK 58 app currently opens to the login/sign-up screen. It includes form validation, password visibility, a sport-neutral squad illustration, and Reanimated feedback. Authentication and Google sign-in show availability messages; no credentials are sent or stored persistently.
+This Expo SDK 58 app supports email login, username/email registration, session restoration, and logout against the local API. Signed-in users land on a protected account screen. Pending states use the Reanimated hash loader; Google sign-in and password reset remain unavailable until the API supports them.
 
 ## Development
 
@@ -39,7 +39,7 @@ import { HashLoader } from '@/components/hash-loader';
 
 ## API client
 
-Axios handles requests; TanStack Query is provided at the root layout. The typed auth service in `src/features/auth/api.ts` follows the local Swagger contract for register, login, refresh, logout, and profile. Form wiring and secure session handling are the next checkpoint; the login screen still shows availability messages.
+Axios handles requests; TanStack Query is provided at the root layout. The typed auth service in `src/features/auth/api.ts` follows the local Swagger contract for register, login, refresh, logout, and profile. TanStack mutations connect the forms to a serialized session controller; the profile query calls the authenticated profile endpoint and retries an unauthorized request once after rotating credentials.
 
 Copy `.env.example` to `.env.local` to configure `EXPO_PUBLIC_API_URL`, including the `/api` suffix. Development defaults to `http://localhost:3001/api`. Production requires an explicit URL. Reload the app after changing environment variables.
 
@@ -47,6 +47,17 @@ Copy `.env.example` to `.env.local` to configure `EXPO_PUBLIC_API_URL`, includin
 - Android emulator: `http://10.0.2.2:3001/api`, or forward localhost using `adb -s <serial> reverse tcp:3001 tcp:3001`.
 - Physical device: use the computer's LAN address with the API listening on that interface, or USB forwarding on Android.
 
-Requests time out after 15 seconds. Errors retain HTTP status, validation messages, and Retry-After seconds without retaining Axios request configuration or credentials. Queries retry transient failures once; mutations do not retry automatically. Refresh calls must be serialized by the upcoming session layer, which must retain the replacement refresh credential.
+Requests time out after 15 seconds. Errors retain HTTP status, validation messages, and Retry-After seconds without retaining Axios request configuration or credentials. Queries retry transient failures once; mutations do not retry automatically. The session controller serializes refresh and logout calls and saves each replacement refresh credential before publishing the session. Completed auth mutation state is reset to release credential variables.
 
 The API supports email login and username registration (3–30 lowercase letters, numbers, or underscores), with registration passwords of 12–128 characters. It does not document phone login, Google sign-in, password reset, or a team-name field.
+
+
+## Authentication and native setup
+
+Native refresh credentials are encrypted with Expo SecureStore and scoped to the configured API URL. Access tokens and public profiles stay in memory. Native startup restores a saved session by rotating its refresh credential; network failure preserves it and offers retry. A revoked or expired session returns to sign-in. Browser credentials remain in memory and are lost on a full page reload; no tokens are written to localStorage or sessionStorage.
+
+SecureStore is a new native dependency, so rebuild the existing Android app with `bun run android` before using authentication. The existing Android manifest now references `@xml/secure_store_backup_rules` and `@xml/secure_store_data_extraction_rules` from SecureStore to exclude encrypted preferences from backup. The native directory is currently Git-ignored, so these native edits need to be retained alongside the prebuilt project. No native directories were regenerated and app.json is unchanged. The iOS project is currently absent and was not generated.
+
+Successful login or registration opens `/account`. The screen displays the profile, preserves known profile data during refresh errors, offers retry, and logs out using the latest refresh credential. If remote logout fails, the screen reports the error and allows another attempt. During restoration, “Clear saved sign-in” removes the local credential; it does not claim to revoke an unreachable server session.
+
+Verification covered the live API through the session controller with in-memory storage: registration, concurrent 401 recovery using one shared refresh, restoration, wrong-password rejection, logout, and rejection of a revoked credential. One local verification account (`codex_auth_mwj5663i`) remains; its sessions were logged out. Native encrypted persistence, device UI, navigation, and motion have not been exercised on a device.

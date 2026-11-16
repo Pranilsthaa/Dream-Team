@@ -7,6 +7,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { SessionGate } from "@/components/session-gate";
+import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { theme } from "@/constants/theme";
 import { QueryProvider } from "@/providers/query-provider";
 
@@ -33,16 +35,28 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <KeyboardProvider>
           <QueryProvider>
-            <StatusBar style="light" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: theme.colors.background },
-              }}
-            />
+            <AuthProvider>
+              <StatusBar style="light" />
+              <AuthNavigator />
+            </AuthProvider>
           </QueryProvider>
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+function AuthNavigator() {
+  const { session } = useAuth();
+  if (session.status === 'restoring' || session.status === 'restore-error') return <SessionGate />;
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
+      <Stack.Protected guard={session.status === 'signed-out'}>
+        <Stack.Screen name="index" />
+      </Stack.Protected>
+      <Stack.Protected guard={session.status === 'signed-in'}>
+        <Stack.Screen name="account" />
+      </Stack.Protected>
+    </Stack>
   );
 }

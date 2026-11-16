@@ -3,15 +3,18 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated, { cubicBezier, useReducedMotion } from 'react-native-reanimated';
 
 import { theme } from '@/constants/theme';
+import { HashLoader } from './hash-loader';
 
 type Props = {
   children: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary';
   icon?: ReactNode;
+  loading?: boolean;
+  disabled?: boolean;
 };
 
-export function ActionButton({ children, onPress, variant = 'primary', icon }: Props) {
+export function ActionButton({ children, onPress, variant = 'primary', icon, loading = false, disabled = false }: Props) {
   const [pressed, setPressed] = useState(false);
   const reducedMotion = useReducedMotion();
   const primary = variant === 'primary';
@@ -19,6 +22,9 @@ export function ActionButton({ children, onPress, variant = 'primary', icon }: P
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={children}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      disabled={disabled || loading}
       onPress={onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
@@ -30,14 +36,14 @@ export function ActionButton({ children, onPress, variant = 'primary', icon }: P
           primary ? styles.primary : styles.secondary,
           {
             transform: [{ scale: pressed && !reducedMotion ? 0.97 : 1 }],
-            opacity: pressed ? 0.85 : 1,
+            opacity: disabled && !loading ? 0.5 : pressed ? 0.85 : 1,
             transitionProperty: ['transform', 'opacity'],
             transitionDuration: reducedMotion ? 0 : theme.motion.pressDuration,
             transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
           },
         ]}
       >
-        {icon}
+        {loading ? <HashLoader size={22} color={primary ? theme.colors.ink : theme.colors.text} accessible={false} /> : icon}
         <Text style={[styles.label, primary ? styles.primaryLabel : styles.secondaryLabel]}>{children}</Text>
       </Animated.View>
     </Pressable>
