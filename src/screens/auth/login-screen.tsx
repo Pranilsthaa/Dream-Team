@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 import {
   Keyboard,
   Pressable,
@@ -7,13 +8,16 @@ import {
   Text,
   View,
 } from "react-native";
-import { useForm } from "react-hook-form";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
 import { ActionButton } from "@/components/action-button";
 import { theme } from "@/constants/theme";
-import { authFormDefaults, authFormResolver, type AuthFormValues } from "@/features/auth/form";
+import {
+  authFormDefaults,
+  authFormResolver,
+  type AuthFormValues,
+} from "@/features/auth/form";
 import { useSignInMutation } from "@/features/auth/hooks";
 import { ApiError } from "@/lib/api/api-error";
 import { useAuth } from "@/providers/auth-provider";
@@ -36,7 +40,14 @@ export function LoginScreen() {
   const requestInFlight = useRef(false);
   const signup = mode === "signup";
   const {
-    control, handleSubmit, setFocus, setError, clearErrors, reset, resetField, trigger,
+    control,
+    handleSubmit,
+    setFocus,
+    setError,
+    clearErrors,
+    reset,
+    resetField,
+    trigger,
     formState: { errors, isSubmitting },
   } = useForm<AuthFormValues>({
     defaultValues: authFormDefaults,
@@ -72,9 +83,21 @@ export function LoginScreen() {
   async function onValid(values: AuthFormValues) {
     Keyboard.dismiss();
     try {
-      await mutation.mutateAsync(signup
-        ? { mode: "signup", input: { username: values.username, email: values.email, password: values.password } }
-        : { mode: "login", input: { email: values.email, password: values.password } });
+      await mutation.mutateAsync(
+        signup
+          ? {
+              mode: "signup",
+              input: {
+                username: values.username,
+                email: values.email,
+                password: values.password,
+              },
+            }
+          : {
+              mode: "login",
+              input: { email: values.email, password: values.password },
+            },
+      );
       resetField("password", { defaultValue: "" });
     } catch (error) {
       if (error instanceof ApiError && error.status === 429) {
@@ -84,9 +107,12 @@ export function LoginScreen() {
       }
       setError("root.server", {
         type: "server",
-        message: error instanceof ApiError && error.status === 401
-          ? "The email or password is incorrect. Please try again."
-          : error instanceof Error ? error.message : "Could not sign in. Please try again.",
+        message:
+          error instanceof ApiError && error.status === 401
+            ? "The email or password is incorrect. Please try again."
+            : error instanceof Error
+              ? error.message
+              : "Could not sign in. Please try again.",
       });
     } finally {
       mutation.reset();
@@ -98,9 +124,13 @@ export function LoginScreen() {
     requestInFlight.current = true;
     clearFeedback();
     try {
-      await handleSubmit(onValid, validationErrors => {
-        const first = signup && validationErrors.username ? "username"
-          : validationErrors.email ? "email" : "password";
+      await handleSubmit(onValid, (validationErrors) => {
+        const first =
+          signup && validationErrors.username
+            ? "username"
+            : validationErrors.email
+              ? "email"
+              : "password";
         setFocus(first);
       })();
     } finally {
@@ -111,7 +141,7 @@ export function LoginScreen() {
   async function forgotPassword() {
     if (requestInFlight.current) return;
     clearFeedback();
-    if (!await trigger("email", { shouldFocus: true })) return;
+    if (!(await trigger("email", { shouldFocus: true }))) return;
     Keyboard.dismiss();
     setNotice("Password reset is coming soon. No reset message has been sent.");
   }
@@ -143,7 +173,10 @@ export function LoginScreen() {
                   key={tab}
                   disabled={busy}
                   accessibilityRole="tab"
-                  accessibilityState={{ selected: mode === tab, disabled: busy }}
+                  accessibilityState={{
+                    selected: mode === tab,
+                    disabled: busy,
+                  }}
                   onPress={() => changeMode(tab)}
                   style={({ pressed }) => [
                     styles.tab,
@@ -205,7 +238,9 @@ export function LoginScreen() {
                 onEdit={clearFeedback}
                 nativeID="password"
                 label="Password"
-                placeholder={signup ? "At least 12 characters" : "Your password"}
+                placeholder={
+                  signup ? "At least 12 characters" : "Your password"
+                }
                 editable={!busy}
                 maxLength={128}
                 secureTextEntry={!passwordVisible}
@@ -248,9 +283,20 @@ export function LoginScreen() {
                 </Pressable>
               ) : null}
               <View style={signup ? styles.signupAction : undefined}>
-                <ActionButton onPress={submit} loading={busy} disabled={cooldown > 0}>
-                  {busy ? signup ? "Creating account…" : "Signing in…"
-                    : cooldown > 0 ? `Try again in ${cooldown}s` : signup ? "Create account" : "Enter the game"}
+                <ActionButton
+                  onPress={submit}
+                  loading={busy}
+                  disabled={cooldown > 0}
+                >
+                  {busy
+                    ? signup
+                      ? "Creating account…"
+                      : "Signing in…"
+                    : cooldown > 0
+                      ? `Try again in ${cooldown}s`
+                      : signup
+                        ? "Create account"
+                        : "Enter the game"}
                 </ActionButton>
               </View>
               {message ? (
@@ -275,7 +321,7 @@ export function LoginScreen() {
                       pressed && styles.pressed,
                     ]}
                   >
-                    <Text style={styles.dismissText}>×</Text>
+                    <Text style={styles.dismissText}>x</Text>
                   </Pressable>
                 </Animated.View>
               ) : null}

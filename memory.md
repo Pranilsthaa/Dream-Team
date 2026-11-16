@@ -130,3 +130,14 @@ Auth checkpoint final validation: lint (zero warnings), TypeScript, git diff whi
 - Device actions were not requested or performed for this migration; earlier device-access denial remains in force.
 
 React Hook Form checkpoint validation: installed react-hook-form 7.92.0 through Expo CLI; lint (zero warnings), typecheck, git diff whitespace checks, and iOS/Android/web bundle exports passed. Device interactions were not rechecked.
+
+
+### API logger
+
+- Added `src/lib/api/logger.ts` and called its request/response/error functions from the shared Axios interceptors. Every current API method uses this client; no screen-by-screen logging is needed. Logging runs in all builds as requested.
+- Request logs include ID, method, actual Axios URL, query params, and body if present. Success logs include ID/status/duration without response bodies. Errors log raw backend response data before ApiError normalization, plus status/code/Retry-After/duration. Intentional cancellations use CANCELED informational logs.
+- Copies recursively redact sensitive keys and known request secrets (including echoed error messages), bearer/JWT/opaque refresh credentials, and URL credentials/query secrets. Serialized JSON request bodies are parsed for redaction. Logger metadata is keyed by request configuration in a WeakMap, so it is released with the request. Raw Axios errors/configs are never logged; logging failure does not replace the response/error.
+- Verified using controlled Axios adapters: query params and backend validation details were logged, successful and failed calls were correlated, nested secrets/echoed credentials were absent, the original request data stayed intact, and backend 500 still became the expected ApiError. No device actions or real API mutations were needed.
+- Preserved existing user edits to login-screen.tsx. No dependencies, app.json, or native configuration changes.
+
+API logger validation: controlled Axios adapter verification passed for parameters/body logging, success/error output, echoed-secret redaction, unchanged request payloads, and preserved ApiError normalization. Lint (zero warnings), TypeScript, git diff whitespace checks, and iOS/Android/web exports passed. Existing user edits to login-screen.tsx were preserved.

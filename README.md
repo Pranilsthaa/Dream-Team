@@ -68,3 +68,10 @@ Verification covered the live API through the session controller with in-memory 
 Use React Hook Form for all forms. The login/sign-up screen uses typed `useForm` state, an API-aligned resolver in `src/features/auth/form.ts`, and `useController` bindings in `AuthField`. Native inputs forward changes, blur, and refs through React Hook Form; validation errors and API submission errors are managed by the form. Keyboard next actions and invalid-submit focus use `setFocus`.
 
 Mode changes preserve entered values while resetting validation/submission state. Failed API submissions retain the draft; successful sign-in resets the password. Pending submissions block repeat requests and retain the hash loading indicator. Keep presentation state such as password visibility, notices for unavailable actions, and rate-limit timing separate from field state.
+
+
+## API logging
+
+The shared Axios client automatically uses `src/lib/api/logger.ts` for every request in all builds. Console entries use `[API #id] REQUEST`, `RESPONSE`, and `ERROR` (or `CANCELED`) to correlate calls. Requests include method, URL, query parameters, and body when supplied. Completion entries include HTTP status and duration. Errors include the backend response body before ApiError normalization, status/code, Retry-After, and duration; network errors are also logged.
+
+Passwords, passphrases, tokens, API keys, cookies, authorization values, URL credentials, and known request secrets echoed in error messages are redacted. Successful response bodies and raw Axios error/config objects are not logged. Logging does not mutate request data or change response/error handling. Logs go to the JavaScript console; no external logging service or file storage is configured.
