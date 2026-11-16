@@ -1,18 +1,19 @@
-import { useEffect, useRef, useState, type ComponentRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Keyboard,
   Pressable,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { useForm } from "react-hook-form";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
 import { ActionButton } from "@/components/action-button";
 import { theme } from "@/constants/theme";
+import { authFormDefaults, authFormResolver, type AuthFormValues } from "@/features/auth/form";
 import { useSignInMutation } from "@/features/auth/hooks";
 import { ApiError } from "@/lib/api/api-error";
 import { useAuth } from "@/providers/auth-provider";
@@ -21,18 +22,11 @@ import { AuthField } from "./auth-field";
 import { SquadPreview } from "./squad-preview";
 
 type Mode = "login" | "signup";
-type Field = "username" | "identity" | "password";
-type Errors = Partial<Record<Field, string>>;
 const noticeEntrance = FadeIn.duration(160);
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function LoginScreen() {
   const [mode, setMode] = useState<Mode>("login");
-  const [username, setUsername] = useState("");
-  const [identity, setIdentity] = useState("");
-  const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [errors, setErrors] = useState<Errors>({});
   const { session } = useAuth();
   const mutation = useSignInMutation();
   const [notice, setNotice] = useState(session.message ?? "");
@@ -40,90 +34,84 @@ export function LoginScreen() {
   const [clock, setClock] = useState(Date.now);
   const cooldown = Math.max(0, Math.ceil((retryUntil - clock) / 1000));
   const requestInFlight = useRef(false);
-  const busy = mutation.isPending;
+  const signup = mode === "signup";
+  const {
+    control, handleSubmit, setFocus, setError, clearErrors, reset, resetField, trigger,
+    formState: { errors, isSubmitting },
+  } = useForm<AuthFormValues>({
+    defaultValues: authFormDefaults,
+    resolver: authFormResolver(signup),
+    mode: "onSubmit",
+    reValidateMode: "onChange",
+    shouldFocusError: false,
+  });
+  const busy = isSubmitting || mutation.isPending;
+  const message = errors.root?.server?.message ?? notice;
 
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setTimeout(() => setClock(Date.now()), 1000);
     return () => clearTimeout(timer);
   }, [cooldown, retryUntil]);
-  const usernameRef = useRef<ComponentRef<typeof TextInput>>(null);
-  const identityRef = useRef<ComponentRef<typeof TextInput>>(null);
-  const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
   const reducedMotion = useReducedMotion();
-  const signup = mode === "signup";
-
   const { bottom } = useSafeAreaInsets();
 
   function changeMode(nextMode: Mode) {
-    if (nextMode === mode || busy) return;
+    if (nextMode === mode || busy || requestInFlight.current) return;
     setMode(nextMode);
-    setErrors({});
+    reset(undefined, { keepValues: true });
     setNotice("");
     setPasswordVisible(false);
   }
 
-  function update(field: Field, value: string) {
-    if (field === "username") setUsername(value);
-    if (field === "identity") setIdentity(value);
-    if (field === "password") setPassword(value);
-    setErrors((current) => ({ ...current, [field]: undefined }));
+  function clearFeedback() {
+    clearErrors("root.server");
     setNotice("");
   }
 
-  function validateIdentity() {
-    const value = identity.trim();
-    if (!value) return "Enter your email address.";
-    if (!emailPattern.test(value) || value.length > 254) return "Enter a valid email address.";
-    return undefined;
-  }
-
-  async function submit() {
-    if (requestInFlight.current || cooldown > 0) return;
-    const normalizedUsername = username.trim().toLowerCase();
-    const nextErrors: Errors = {
-      username: signup && !/^[a-z0-9_]{3,30}$/.test(normalizedUsername)
-        ? "Use 3–30 letters, numbers, or underscores." : undefined,
-      identity: validateIdentity(),
-      password: password.length < (signup ? 12 : 1) || password.length > 128
-        ? signup ? "Use a passphrase of 12–128 characters." : "Enter your password (up to 128 characters)."
-        : undefined,
-    };
-    setErrors(nextErrors);
-    setNotice("");
-    if (nextErrors.username) return usernameRef.current?.focus();
-    if (nextErrors.identity) return identityRef.current?.focus();
-    if (nextErrors.password) return passwordRef.current?.focus();
-    requestInFlight.current = true;
+  async function onValid(values: AuthFormValues) {
     Keyboard.dismiss();
     try {
       await mutation.mutateAsync(signup
-        ? { mode: "signup", input: { username: normalizedUsername, email: identity, password } }
-        : { mode: "login", input: { email: identity, password } });
-      setPassword("");
+        ? { mode: "signup", input: { username: values.username, email: values.email, password: values.password } }
+        : { mode: "login", input: { email: values.email, password: values.password } });
+      resetField("password", { defaultValue: "" });
     } catch (error) {
       if (error instanceof ApiError && error.status === 429) {
         const now = Date.now();
         setClock(now);
         setRetryUntil(now + (error.retryAfterSeconds ?? 60) * 1000);
       }
-      setNotice(error instanceof ApiError && error.status === 401
-        ? "The email or password is incorrect. Please try again."
-        : error instanceof Error ? error.message : "Could not sign in. Please try again.");
+      setError("root.server", {
+        type: "server",
+        message: error instanceof ApiError && error.status === 401
+          ? "The email or password is incorrect. Please try again."
+          : error instanceof Error ? error.message : "Could not sign in. Please try again.",
+      });
     } finally {
-      requestInFlight.current = false;
       mutation.reset();
     }
   }
 
-  function forgotPassword() {
-    const error = validateIdentity();
-    setErrors((current) => ({ ...current, identity: error }));
-    if (error) {
-      setNotice("");
-      identityRef.current?.focus();
-      return;
+  async function submit() {
+    if (requestInFlight.current || cooldown > 0) return;
+    requestInFlight.current = true;
+    clearFeedback();
+    try {
+      await handleSubmit(onValid, validationErrors => {
+        const first = signup && validationErrors.username ? "username"
+          : validationErrors.email ? "email" : "password";
+        setFocus(first);
+      })();
+    } finally {
+      requestInFlight.current = false;
     }
+  }
+
+  async function forgotPassword() {
+    if (requestInFlight.current) return;
+    clearFeedback();
+    if (!await trigger("email", { shouldFocus: true })) return;
     Keyboard.dismiss();
     setNotice("Password reset is coming soon. No reset message has been sent.");
   }
@@ -178,13 +166,12 @@ export function LoginScreen() {
             <View style={styles.form}>
               {signup ? (
                 <AuthField
-                  ref={usernameRef}
+                  control={control}
+                  name="username"
+                  onEdit={clearFeedback}
                   nativeID="username"
                   label="Username"
                   placeholder="underdog_united"
-                  value={username}
-                  error={errors.username}
-                  onChangeText={(value) => update("username", value)}
                   autoComplete="username"
                   autoCapitalize="none"
                   maxLength={30}
@@ -192,37 +179,35 @@ export function LoginScreen() {
                   editable={!busy}
                   returnKeyType="next"
                   submitBehavior="submit"
-                  onSubmitEditing={() => identityRef.current?.focus()}
+                  onSubmitEditing={() => setFocus("email")}
                 />
               ) : null}
               <AuthField
-                ref={identityRef}
+                control={control}
+                name="email"
+                onEdit={clearFeedback}
                 nativeID="identity"
                 label="Email"
                 placeholder="you@example.com"
-                value={identity}
                 editable={!busy}
                 maxLength={254}
-                error={errors.identity}
-                onChangeText={(value) => update("identity", value)}
                 autoComplete="email"
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
                 returnKeyType="next"
                 submitBehavior="submit"
-                onSubmitEditing={() => passwordRef.current?.focus()}
+                onSubmitEditing={() => setFocus("password")}
               />
               <AuthField
-                ref={passwordRef}
+                control={control}
+                name="password"
+                onEdit={clearFeedback}
                 nativeID="password"
                 label="Password"
                 placeholder={signup ? "At least 12 characters" : "Your password"}
-                value={password}
                 editable={!busy}
                 maxLength={128}
-                error={errors.password}
-                onChangeText={(value) => update("password", value)}
                 secureTextEntry={!passwordVisible}
                 autoComplete={signup ? "new-password" : "current-password"}
                 autoCapitalize="none"
@@ -268,7 +253,7 @@ export function LoginScreen() {
                     : cooldown > 0 ? `Try again in ${cooldown}s` : signup ? "Create account" : "Enter the game"}
                 </ActionButton>
               </View>
-              {notice ? (
+              {message ? (
                 <Animated.View
                   entering={reducedMotion ? undefined : noticeEntrance}
                   style={styles.notice}
@@ -278,13 +263,13 @@ export function LoginScreen() {
                     accessibilityLiveRegion="polite"
                     style={styles.noticeText}
                   >
-                    {notice}
+                    {message}
                   </Text>
                   <Pressable
                     accessibilityRole="button"
                     disabled={busy}
                     accessibilityLabel="Dismiss message"
-                    onPress={() => setNotice("")}
+                    onPress={clearFeedback}
                     style={({ pressed }) => [
                       styles.dismiss,
                       pressed && styles.pressed,
@@ -306,6 +291,7 @@ export function LoginScreen() {
               disabled={busy}
               onPress={() => {
                 Keyboard.dismiss();
+                clearFeedback();
                 setNotice(
                   "Google sign-in is coming soon. Please check back later.",
                 );

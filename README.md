@@ -61,3 +61,10 @@ SecureStore is a new native dependency, so rebuild the existing Android app with
 Successful login or registration opens `/account`. The screen displays the profile, preserves known profile data during refresh errors, offers retry, and logs out using the latest refresh credential. If remote logout fails, the screen reports the error and allows another attempt. During restoration, “Clear saved sign-in” removes the local credential; it does not claim to revoke an unreachable server session.
 
 Verification covered the live API through the session controller with in-memory storage: registration, concurrent 401 recovery using one shared refresh, restoration, wrong-password rejection, logout, and rejection of a revoked credential. One local verification account (`codex_auth_mwj5663i`) remains; its sessions were logged out. Native encrypted persistence, device UI, navigation, and motion have not been exercised on a device.
+
+
+## Forms
+
+Use React Hook Form for all forms. The login/sign-up screen uses typed `useForm` state, an API-aligned resolver in `src/features/auth/form.ts`, and `useController` bindings in `AuthField`. Native inputs forward changes, blur, and refs through React Hook Form; validation errors and API submission errors are managed by the form. Keyboard next actions and invalid-submit focus use `setFocus`.
+
+Mode changes preserve entered values while resetting validation/submission state. Failed API submissions retain the draft; successful sign-in resets the password. Pending submissions block repeat requests and retain the hash loading indicator. Keep presentation state such as password visibility, notices for unavailable actions, and rate-limit timing separate from field state.

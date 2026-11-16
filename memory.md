@@ -117,3 +117,16 @@ API foundation validation: final `bun run lint` passed with zero warnings; `bun 
 - Final code checks and platform bundle export results follow below. Pause for review after this checkpoint.
 
 Auth checkpoint final validation: lint (zero warnings), TypeScript, git diff whitespace checks, and iOS/Android/web bundle exports all passed. Live API checks passed as described above. Native compilation, installation, device UI, and SecureStore persistence remain unverified; a native rebuild is required for the new module. app.json has no diff. Paused for user review.
+
+
+### React Hook Form migration
+
+- User reported the preceding auth work complete, then requested React Hook Form for all forms. Installed react-hook-form 7.92.0 through `bunx expo install`.
+- Audited all app inputs; the only current forms are login/sign-up in `src/screens/auth/login-screen.tsx`. Both now use typed `useForm<AuthFormValues>` with controlled native fields through `AuthField`/`useController`. No field values, validation errors, or input refs are held in manual screen state.
+- Added `src/features/auth/form.ts` for blank defaults and mode-aware validation matching the API: sign-up username 3–30 alphanumeric/underscore after normalization, email validation/max 254, registration password 12–128, login password 1–128; password whitespace/case remain unchanged.
+- React Hook Form owns field errors and root.server API errors; `isSubmitting` combines with mutation state for pending/disabled UI. Invalid submission uses setFocus in visual field order; keyboard next actions use setFocus. Native field refs, onChangeText, and onBlur are wired to useController.
+- Mode switching preserves values while resetting form state/errors, including registration-only username validation. Failed API calls retain the draft. Successful sign-in resets the password; mutation reset and immediate duplicate-submit guards remain. Forgot-password email validation uses trigger. Rate-limit cooldown, password visibility, and availability notices remain presentation state.
+- Added a persistent Forms rule in AGENTS.md requiring React Hook Form for every future form, with Controller/useController for native fields. Updated README with the convention. No app.json, native setup, authentication service, or session-controller changes.
+- Device actions were not requested or performed for this migration; earlier device-access denial remains in force.
+
+React Hook Form checkpoint validation: installed react-hook-form 7.92.0 through Expo CLI; lint (zero warnings), typecheck, git diff whitespace checks, and iOS/Android/web bundle exports passed. Device interactions were not rechecked.

@@ -1,4 +1,5 @@
-import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { useController, type FieldValues, type UseControllerProps } from "react-hook-form";
 import {
   StyleSheet,
   Text,
@@ -9,14 +10,21 @@ import {
 
 import { theme } from "@/constants/theme";
 
-type Props = TextInputProps & {
-  label: string;
-  error?: string;
-  trailing?: ReactNode;
-  ref?: ComponentPropsWithRef<typeof TextInput>["ref"];
-};
+type Props<T extends FieldValues> = Omit<TextInputProps, "value" | "onChangeText" | "onBlur" | "defaultValue"> &
+  Pick<UseControllerProps<T>, "control" | "name" | "rules" | "shouldUnregister"> & {
+    label: string;
+    trailing?: ReactNode;
+    onEdit?: () => void;
+  };
 
-export function AuthField({ label, error, trailing, ref, ...props }: Props) {
+export function AuthField<T extends FieldValues>({
+  control, name, rules, shouldUnregister, label, trailing, onEdit, ...props
+}: Props<T>) {
+  const {
+    field: { ref: inputRef, value, onChange, onBlur },
+    fieldState,
+  } = useController({ control, name, rules, shouldUnregister });
+  const error = fieldState.error?.message;
   const [focused, setFocused] = useState(false);
   const id = props.nativeID;
 
@@ -34,7 +42,12 @@ export function AuthField({ label, error, trailing, ref, ...props }: Props) {
       >
         <TextInput
           {...props}
-          ref={ref}
+          ref={inputRef}
+          value={value}
+          onChangeText={(value) => {
+            onChange(value);
+            onEdit?.();
+          }}
           accessibilityLabel={label}
           accessibilityLabelledBy={id ? `${id}-label` : undefined}
           accessibilityHint={error}
@@ -47,9 +60,9 @@ export function AuthField({ label, error, trailing, ref, ...props }: Props) {
             setFocused(true);
             props.onFocus?.(event);
           }}
-          onBlur={(event) => {
+          onBlur={() => {
             setFocused(false);
-            props.onBlur?.(event);
+            onBlur();
           }}
           style={[styles.input, props.style]}
         />
