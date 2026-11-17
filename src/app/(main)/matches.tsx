@@ -1,5 +1,1 @@
-import { OverviewScreen } from '@/screens/dashboard/overview-screen';
-
-export default function Screen() {
-  return <OverviewScreen section="matches" />;
-}
+export { MatchesScreen as default } from "@/screens/dashboard/matches-screen";

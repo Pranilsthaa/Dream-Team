@@ -1,5 +1,1 @@
-import { OverviewScreen } from '@/screens/dashboard/overview-screen';
-
-export default function Screen() {
-  return <OverviewScreen section="leagues" />;
-}
+export { LeaguesScreen as default } from "@/screens/dashboard/leagues-screen";

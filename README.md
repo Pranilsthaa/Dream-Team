@@ -41,7 +41,7 @@ import { HashLoader } from '@/components/hash-loader';
 
 Axios handles requests; TanStack Query is provided at the root layout. The typed auth service in `src/features/auth/api.ts` follows the local Swagger contract for register, login, refresh, logout, and profile. TanStack mutations connect the forms to a serialized session controller; the profile query calls the authenticated profile endpoint and retries an unauthorized request once after rotating credentials.
 
-Copy `.env.example` to `.env.local` to configure `EXPO_PUBLIC_API_URL`, including the `/api` suffix. Development defaults to `http://localhost:3001/api`. Production requires an explicit URL. Reload the app after changing environment variables.
+Copy `.env.example` to `.env.local` to configure `EXPO_PUBLIC_API_URL`, including the `/api` suffix. Development currently defaults to the Android emulator address, `http://10.0.2.2:3001/api`. Production requires an explicit URL. Reload the app after changing environment variables.
 
 - Web/iOS simulator: `http://localhost:3001/api`.
 - Android emulator: `http://10.0.2.2:3001/api`, or forward localhost using `adb -s <serial> reverse tcp:3001 tcp:3001`.
@@ -105,6 +105,12 @@ The backend rotates refresh credentials without a documented recovery/grace endp
 
 ## Post-login UI
 
-Signed-in users now enter the four-tab dashboard at `/home`. The Home screen follows `after-login.html`, using local mock leagues, stats, scoring rules, and leaderboard data. Notifications and scoring details use Expo UI bottom sheets. Tap the avatar to reach the existing account/profile/logout screen.
+Signed-in users enter the four-tab dashboard at `/home`, following `after-login.html`. Lucide supplies dashboard icons. All sheets use the shared `src/components/bottom-sheet.tsx` component backed by `@lodev09/react-native-true-sheet`. Tap the avatar to reach account/profile/logout.
 
-Checkpoint 1 provides Home and navigation. Squad, Matches, and Leagues are basic previews; their full layouts and actions are scheduled for the next checkpoints. League/match/squad content does not call the backend.
+The shared sheet accepts `open`, `onClose`, `title`, optional `description`, and children. It supplies the forest theme, native drag handle, Close action, scrollable content, and keyboard handling. Open/close animations run through True Sheet; changes are serialized to avoid overlapping transitions. Gesture and back dismissals update the caller through `onClose`. The root includes `TrueSheetProvider`; web uses its required Radix dialog/presence dependencies. Rebuild the prebuilt Android app with `bun run android` after installing this native dependency. No app.json or prebuild changes are required.
+
+Checkpoint 2 adds the squad pitch, player breakdowns, captain/vice selection, match filters, and league/tournament integration. `src/features/leagues/api.ts` uses the authenticated Axios client for paginated league/tournament lists, creation, and editing. TanStack Query caches by user and league and refreshes lists after saves. League and tournament forms use React Hook Form. Owner controls support league editing and draft tournament editing; the list API does not expose staff roles, so admin-specific controls are deferred.
+
+The API currently creates cricket leagues only. Tournament creation uses the server's default timezone; existing dates and timezone are preserved when editing name/season. Matches uses the public global fixtures endpoint; it does not imply fixtures belong to the selected league.
+
+Squad players, points, budget, scoring, leaderboard, and notifications remain clearly labeled previews. Captain/vice choices are local to the mounted screen and league; “Save preview” sends nothing to the API. Invite-code joining and league player management show availability notices because those endpoints are not documented. Staff administration and richer tournament scheduling remain future work.
