@@ -48,7 +48,7 @@ export function LoginScreen() {
     reset,
     resetField,
     trigger,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<AuthFormValues>({
     defaultValues: authFormDefaults,
     resolver: authFormResolver(signup),
@@ -56,7 +56,7 @@ export function LoginScreen() {
     reValidateMode: "onChange",
     shouldFocusError: false,
   });
-  const busy = isSubmitting || mutation.isPending;
+  const busy = mutation.isPending;
   const message = errors.root?.server?.message ?? notice;
 
   useEffect(() => {
