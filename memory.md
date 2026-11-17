@@ -1,6 +1,6 @@
 # Dream-Team project memory
 
-Updated: 2026-11-16 (Asia/Kathmandu).
+Updated: 2026-11-17 (Asia/Kathmandu).
 
 ## Product
 
@@ -141,3 +141,15 @@ React Hook Form checkpoint validation: installed react-hook-form 7.92.0 through 
 - Preserved existing user edits to login-screen.tsx. No dependencies, app.json, or native configuration changes.
 
 API logger validation: controlled Axios adapter verification passed for parameters/body logging, success/error output, echoed-secret redaction, unchanged request payloads, and preserved ApiError normalization. Lint (zero warnings), TypeScript, git diff whitespace checks, and iOS/Android/web exports passed. Existing user edits to login-screen.tsx were preserved.
+
+
+### Zustand auth state migration (2026-11-17)
+
+- User requested replacing auth-provider's direct useSyncExternalStore integration with Zustand. Installed zustand 5.1.0 using `bunx expo install`.
+- Each SessionController now creates a Zustand vanilla store for public SessionSnapshot state. Removed the custom snapshot property, listener Set, subscribe/getSnapshot methods, and publish helper. Controller updates state through store.setState and reads it through store.getState. Private access/refresh credentials and serialized session operations remain separate.
+- AuthProvider context holds the stable controller instance rather than a changing object containing session data. useAuth() uses Zustand useStore(controller.store) and preserves `{controller, session}` for existing screens/hooks.
+- Startup restoration and cleanup remain in the provider effect. A Zustand subscription receives next/previous states directly and cancels/removes queries when user identity changes. Effect cleanup unsubscribes. Stores remain scoped to each provider/controller, avoiding a server-global session store.
+- No direct useSyncExternalStore calls or custom listener/snapshot plumbing remain in app source. Native SecureStore persistence, token rotation, refresh serialization, API mutations, forms, protected routes, and logger are preserved. No native/app.json changes.
+- Controlled API/storage verification passed: signed-out restoration, login state notifications, subscription cleanup, instance isolation, saved-session restoration, logout/credential clearing, and exactly one shared refresh for concurrent 401s. No backend account mutations or device access were needed.
+
+Zustand migration validation: lint (zero warnings), TypeScript, git diff whitespace checks, and iOS/Android/web bundle exports passed. Controlled store/session checks passed. Device interactions were not rechecked.

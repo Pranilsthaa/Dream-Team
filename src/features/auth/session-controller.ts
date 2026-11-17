@@ -1,3 +1,5 @@
+import { createStore } from 'zustand/vanilla';
+
 import { ApiError } from '@/lib/api/api-error';
 import type { createAuthApi } from './api';
 import type { AuthTokensResponse, LoginInput, PublicUser, RegisterInput } from './types';
@@ -18,22 +20,12 @@ type AuthApi = ReturnType<typeof createAuthApi>;
 
 export class SessionController {
   private session: Session | null = null;
-  private snapshot: SessionSnapshot = { status: 'restoring', user: null, message: null };
-  private listeners = new Set<() => void>();
+  readonly store = createStore<SessionSnapshot>(() => ({
+    status: 'restoring', user: null, message: null,
+  }));
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(private api: AuthApi, private storage: SessionStorage) {}
-
-  getSnapshot = () => this.snapshot;
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener);
-    return () => { this.listeners.delete(listener); };
-  };
-
-  private publish(snapshot: SessionSnapshot) {
-    this.snapshot = snapshot;
-    this.listeners.forEach(listener => listener());
-  }
 
   /** Serializes refresh, persistence, sign-in, and logout against one credential. */
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
@@ -46,9 +38,9 @@ export class SessionController {
     this.session = null;
     try {
       await this.storage.clear();
-      this.publish({ status: 'signed-out', user: null, message });
+      this.store.setState({ status: 'signed-out', user: null, message });
     } catch {
-      this.publish({ status: 'restore-error', user: null, message: 'Could not clear the saved sign-in. Please try again.' });
+      this.store.setState({ status: 'restore-error', user: null, message: 'Could not clear the saved sign-in. Please try again.' });
       throw new Error('Could not clear the saved sign-in. Please try again.');
     }
   }
@@ -62,7 +54,7 @@ export class SessionController {
       throw new Error('Could not securely save your sign-in. Please try again.');
     }
     this.session = { ...tokens, accessExpiresAt: Date.now() + tokens.expiresIn * 1000 };
-    this.publish({ status: 'signed-in', user: tokens.user, message: null });
+    this.store.setState({ status: 'signed-in', user: tokens.user, message: null });
     return this.session;
   }
 
@@ -82,18 +74,18 @@ export class SessionController {
   }
 
   restore = () => this.exclusive(async () => {
-    if (this.snapshot.status !== 'restoring' && this.snapshot.status !== 'restore-error') return;
-    this.publish({ status: 'restoring', user: null, message: null });
+    if (this.store.getState().status !== 'restoring' && this.store.getState().status !== 'restore-error') return;
+    this.store.setState({ status: 'restoring', user: null, message: null });
     try {
       const credential = await this.storage.read();
       if (!credential) {
-        this.publish({ status: 'signed-out', user: null, message: null });
+        this.store.setState({ status: 'signed-out', user: null, message: null });
         return;
       }
       await this.rotate(credential);
     } catch (error) {
-      if (this.getSnapshot().status === 'signed-out') return;
-      this.publish({ status: 'restore-error', user: null, message: error instanceof ApiError
+      if (this.store.getState().status === 'signed-out') return;
+      this.store.setState({ status: 'restore-error', user: null, message: error instanceof ApiError
         ? error.message : 'Could not restore your saved sign-in. Please try again.' });
     }
   });

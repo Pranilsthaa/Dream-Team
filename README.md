@@ -75,3 +75,10 @@ Mode changes preserve entered values while resetting validation/submission state
 The shared Axios client automatically uses `src/lib/api/logger.ts` for every request in all builds. Console entries use `[API #id] REQUEST`, `RESPONSE`, and `ERROR` (or `CANCELED`) to correlate calls. Requests include method, URL, query parameters, and body when supplied. Completion entries include HTTP status and duration. Errors include the backend response body before ApiError normalization, status/code, Retry-After, and duration; network errors are also logged.
 
 Passwords, passphrases, tokens, API keys, cookies, authorization values, URL credentials, and known request secrets echoed in error messages are redacted. Successful response bodies and raw Axios error/config objects are not logged. Logging does not mutate request data or change response/error handling. Logs go to the JavaScript console; no external logging service or file storage is configured.
+
+
+## Auth state
+
+Zustand owns the public session state (`status`, `user`, and `message`) through a vanilla store on each SessionController instance. AuthProvider creates one instance for its subtree and restores the saved session on mount. `useAuth()` reads the session with Zustand's `useStore` and retains the existing `{ controller, session }` interface. A store subscription cancels and removes old queries when the signed-in user changes.
+
+Refresh credentials still use native SecureStore; access tokens remain private to the controller. Zustand does not persist credentials or replace the serialized refresh/logout logic.
