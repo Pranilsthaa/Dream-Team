@@ -25,15 +25,17 @@ export class SessionController {
   }));
   private queue: Promise<unknown> = Promise.resolve();
 
+  // Use the API and storage provided by the app.
   constructor(private api: AuthApi, private storage: SessionStorage) {}
 
-  /** Serializes refresh, persistence, sign-in, and logout against one credential. */
+  // Run session changes one at a time so they do not use the same refresh token twice.
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
     const pending = this.queue.then(operation);
     this.queue = pending.catch(() => undefined);
     return pending;
   }
 
+  // Remove saved credentials and update the app to signed out.
   private async clear(message: string | null = null) {
     this.session = null;
     try {
@@ -45,6 +47,7 @@ export class SessionController {
     }
   }
 
+  // Save the new refresh token before marking the user as signed in.
   private async accept(tokens: AuthTokensResponse) {
     try {
       await this.storage.write({ refreshToken: tokens.refreshToken, refreshExpiresAt: tokens.refreshExpiresAt });
@@ -58,14 +61,19 @@ export class SessionController {
     return this.session;
   }
 
-  private async rotate(credential: StoredCredential) {
+  // Get fresh tokens and wait for any minimum loading time before updating the app.
+  private async rotate(credential: StoredCredential, ready: Promise<void> = Promise.resolve()) {
     if (Date.parse(credential.refreshExpiresAt) <= Date.now()) {
+      await ready;
       await this.clear('Your session expired. Please sign in again.');
       throw new Error('Your session expired. Please sign in again.');
     }
     try {
-      return await this.accept(await this.api.refresh({ refreshToken: credential.refreshToken }));
+      const tokens = await this.api.refresh({ refreshToken: credential.refreshToken });
+      await ready;
+      return await this.accept(tokens);
     } catch (error) {
+      await ready;
       if (error instanceof ApiError && (error.status === 400 || error.status === 401)) {
         await this.clear('Your session expired. Please sign in again.');
       }
@@ -73,38 +81,49 @@ export class SessionController {
     }
   }
 
-  restore = () => this.exclusive(async () => {
+  // Restore saved sign-in details and keep the loader visible for the requested time.
+  restore = (minimumDurationMs = 0) => this.exclusive(async () => {
     if (this.store.getState().status !== 'restoring' && this.store.getState().status !== 'restore-error') return;
     this.store.setState({ status: 'restoring', user: null, message: null });
+    const ready = minimumDurationMs > 0
+      ? new Promise<void>(resolve => setTimeout(resolve, minimumDurationMs))
+      : Promise.resolve();
     try {
       const credential = await this.storage.read();
       if (!credential) {
+        await ready;
         this.store.setState({ status: 'signed-out', user: null, message: null });
         return;
       }
-      await this.rotate(credential);
+      await this.rotate(credential, ready);
     } catch (error) {
+      await ready;
       if (this.store.getState().status === 'signed-out') return;
       this.store.setState({ status: 'restore-error', user: null, message: error instanceof ApiError
         ? error.message : 'Could not restore your saved sign-in. Please try again.' });
     }
   });
 
+  // Remove sign-in details from this device without calling server logout.
   clearSavedSignIn = () => this.exclusive(() => this.clear());
 
+  // Sign in with an email and password, then save the session.
   login = (input: LoginInput) => this.exclusive(async () => {
     await this.accept(await this.api.login(input));
   });
 
+  // Create an account, then save its signed-in session.
   register = (input: RegisterInput) => this.exclusive(async () => {
     await this.accept(await this.api.register(input));
   });
 
+  // End the session on the server, then remove saved sign-in details.
   logout = () => this.exclusive(async () => {
     if (this.session) await this.api.logout({ refreshToken: this.session.refreshToken });
     await this.clear();
   });
 
+  // Return the current session, refreshing tokens if they expire within 30 seconds.
   private validSession = () => this.exclusive(async () => {
     if (!this.session) throw new Error('Please sign in again.');
     if (Date.parse(this.session.refreshExpiresAt) <= Date.now() || this.session.accessExpiresAt <= Date.now() + 30_000) {
@@ -113,6 +132,7 @@ export class SessionController {
     return this.session;
   });
 
+  // Load the user profile and retry once with fresh tokens if access is rejected.
   profile = async (signal?: AbortSignal): Promise<PublicUser> => {
     const session = await this.validSession();
     try {

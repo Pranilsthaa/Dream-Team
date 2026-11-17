@@ -153,3 +153,11 @@ API logger validation: controlled Axios adapter verification passed for paramete
 - Controlled API/storage verification passed: signed-out restoration, login state notifications, subscription cleanup, instance isolation, saved-session restoration, logout/credential clearing, and exactly one shared refresh for concurrent 401s. No backend account mutations or device access were needed.
 
 Zustand migration validation: lint (zero warnings), TypeScript, git diff whitespace checks, and iOS/Android/web bundle exports passed. Controlled store/session checks passed. Device interactions were not rechecked.
+
+
+### Session restoration retry minimum duration
+
+- User requested preventing flicker when SessionGate's Try again action finishes quickly. The button now calls `controller.restore(1000)`.
+- restore accepts an optional minimumDurationMs (default 0), starts its timer alongside storage/network work, and delays publishing terminal signed-in/signed-out/restore-error state until that timer completes. rotate accepts the same completion promise so successful refresh, expired credentials, and rejected refreshes cannot publish early and unmount the gate.
+- Startup restoration and ordinary background refresh retain their existing immediate behavior. Requests taking over one second do not receive an additional second of delay. Preserved the user's existing formatting/UI edits in session-gate.tsx and unrelated account-screen.tsx changes.
+- Verified fast success, fast failure, no saved credential, slow failure, and immediate startup behavior with controlled API/storage implementations. Lint, TypeScript, and git diff whitespace checks passed. No device actions, app.json edits, or new dependencies.
