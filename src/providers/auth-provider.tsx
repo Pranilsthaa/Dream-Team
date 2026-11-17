@@ -9,6 +9,7 @@ import {
 
 import { useStore } from "zustand";
 
+import { bindApiSession } from "@/lib/api/client";
 import { authApi } from "@/features/auth/api";
 import { SessionController } from "@/features/auth/session-controller";
 import { createSessionStorage } from "@/features/auth/session-storage";
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   );
 
   useEffect(() => {
+    const release = bindApiSession(controller);
     const unsubscribe = controller.store.subscribe((next, previous) => {
       if (previous.user?.id !== next.user?.id) {
         client.cancelQueries();
@@ -29,7 +31,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     });
     controller.restore();
-    return unsubscribe;
+    return () => { unsubscribe(); release(); };
   }, [client, controller]);
 
   return <AuthContext value={controller}>{children}</AuthContext>;

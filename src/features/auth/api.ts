@@ -1,6 +1,6 @@
 import type { AxiosInstance } from 'axios';
 
-import { apiClient } from '@/lib/api/client';
+import { apiClient, publicApiClient } from '@/lib/api/client';
 import type {
   AuthTokensResponse,
   LoginInput,
@@ -9,7 +9,7 @@ import type {
   RegisterInput,
 } from './types';
 
-export function createAuthApi(client: AxiosInstance) {
+export function createAuthApi(client: AxiosInstance, protectedClient: AxiosInstance = client) {
   return {
     async register({ username, email, password }: RegisterInput): Promise<AuthTokensResponse> {
       const { data } = await client.post<AuthTokensResponse>('/auth/register', {
@@ -38,9 +38,8 @@ export function createAuthApi(client: AxiosInstance) {
       await client.post<void>('/auth/logout', { refreshToken });
     },
 
-    async me(accessToken: string, signal?: AbortSignal): Promise<ProfileResponse> {
-      const { data } = await client.get<ProfileResponse>('/auth/me', {
-        headers: { Authorization: `Bearer ${accessToken}` },
+    async me(signal?: AbortSignal): Promise<ProfileResponse> {
+      const { data } = await protectedClient.get<ProfileResponse>('/auth/me', {
         signal,
       });
       return data;
@@ -48,4 +47,4 @@ export function createAuthApi(client: AxiosInstance) {
   };
 }
 
-export const authApi = createAuthApi(apiClient);
+export const authApi = createAuthApi(publicApiClient, apiClient);

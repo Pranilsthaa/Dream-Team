@@ -82,3 +82,22 @@ Passwords, passphrases, tokens, API keys, cookies, authorization values, URL cre
 Zustand owns the public session state (`status`, `user`, and `message`) through a vanilla store on each SessionController instance. AuthProvider creates one instance for its subtree and restores the saved session on mount. `useAuth()` reads the session with Zustand's `useStore` and retains the existing `{ controller, session }` interface. A store subscription cancels and removes old queries when the signed-in user changes.
 
 Refresh credentials still use native SecureStore; access tokens remain private to the controller. Zustand does not persist credentials or replace the serialized refresh/logout logic.
+
+
+## Protected API calls
+
+Use the shared authenticated client for any protected endpoint:
+
+```tsx
+import { apiClient } from '@/lib/api/client';
+
+const { data } = await apiClient.get('/players', { params: { page: 1 }, signal });
+```
+
+AuthProvider binds the session on mount. The client prepares a valid bearer token, shares concurrent refreshes, retries an HTTP 401 once, and expires the matching session if that retry is unauthorized. It preserves the original body, parameters, and cancellation signal. No endpoint-specific refresh code is needed; profile uses the same path.
+
+Use `publicApiClient` for deliberately anonymous endpoints. Login, registration, refresh, and logout use this public transport; these routes never enter the refresh loop even if called through apiClient. Protected calls without a session fail before dispatch. Authenticated calls outside the configured API origin/path are blocked to prevent credential leakage.
+
+Only HTTP 401 triggers reactive refresh. Network errors, timeouts, 403, 429, and server errors do not replay the original request. Invalid/expired refresh credentials clear the session; transient refresh failures preserve it for a later explicit attempt. A canceled waiter stops immediately without canceling refresh needed by other callers. Logout/account changes invalidate old requests and prevent replay under the new account, including stale successful responses. Stream bodies are not automatically replayed. Automatic POST retries assume the backend rejects unauthorized requests before applying side effects.
+
+The backend rotates refresh credentials without a documented recovery/grace endpoint. If the server consumes a credential but its refresh response is lost in transit, a later refresh can be rejected and require sign-in again; the client cannot recover that lost credential on its own.

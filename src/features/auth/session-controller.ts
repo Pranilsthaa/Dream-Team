@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 
+import { sessionEnded, type AccessGrant } from '@/lib/api/authentication';
 import { ApiError } from '@/lib/api/api-error';
 import type { createAuthApi } from './api';
 import type { AuthTokensResponse, LoginInput, PublicUser, RegisterInput } from './types';
@@ -20,6 +21,11 @@ type AuthApi = ReturnType<typeof createAuthApi>;
 
 export class SessionController {
   private session: Session | null = null;
+  private epoch = 0;
+  private version = 0;
+  private signingOut = false;
+  private pendingAuthorization: Promise<AccessGrant> | null = null;
+  private recovery: { epoch: number; version: number; promise: Promise<AccessGrant> } | null = null;
   readonly store = createStore<SessionSnapshot>(() => ({
     status: 'restoring', user: null, message: null,
   }));
@@ -37,6 +43,7 @@ export class SessionController {
 
   // Remove saved credentials and update the app to signed out.
   private async clear(message: string | null = null) {
+    this.epoch++;
     this.session = null;
     try {
       await this.storage.clear();
@@ -56,6 +63,7 @@ export class SessionController {
       await this.clear('Could not securely save your sign-in. Please try again.').catch(() => undefined);
       throw new Error('Could not securely save your sign-in. Please try again.');
     }
+    this.version++;
     this.session = { ...tokens, accessExpiresAt: Date.now() + tokens.expiresIn * 1000 };
     this.store.setState({ status: 'signed-in', user: tokens.user, message: null });
     return this.session;
@@ -66,7 +74,7 @@ export class SessionController {
     if (Date.parse(credential.refreshExpiresAt) <= Date.now()) {
       await ready;
       await this.clear('Your session expired. Please sign in again.');
-      throw new Error('Your session expired. Please sign in again.');
+      throw new ApiError('Your session expired. Please sign in again.', 401, 'http');
     }
     try {
       const tokens = await this.api.refresh({ refreshToken: credential.refreshToken });
@@ -109,52 +117,78 @@ export class SessionController {
 
   // Sign in with an email and password, then save the session.
   login = (input: LoginInput) => this.exclusive(async () => {
+    this.epoch++;
     await this.accept(await this.api.login(input));
   });
 
   // Create an account, then save its signed-in session.
   register = (input: RegisterInput) => this.exclusive(async () => {
+    this.epoch++;
     await this.accept(await this.api.register(input));
   });
 
-  // End the session on the server, then remove saved sign-in details.
-  logout = () => this.exclusive(async () => {
-    if (this.session) await this.api.logout({ refreshToken: this.session.refreshToken });
-    await this.clear();
-  });
-
-  // Return the current session, refreshing tokens if they expire within 30 seconds.
-  private validSession = () => this.exclusive(async () => {
-    if (!this.session) throw new Error('Please sign in again.');
-    if (Date.parse(this.session.refreshExpiresAt) <= Date.now() || this.session.accessExpiresAt <= Date.now() + 30_000) {
-      return this.rotate(this.session);
-    }
-    return this.session;
-  });
-
-  // Load the user profile and retry once with fresh tokens if access is rejected.
-  profile = async (signal?: AbortSignal): Promise<PublicUser> => {
-    const session = await this.validSession();
-    try {
-      const { user } = await this.api.me(session.accessToken, signal);
-      return user;
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 401) throw error;
-    }
-
-    const refreshed = await this.exclusive(async () => {
-      if (!this.session) throw new Error('Please sign in again.');
-      return this.session === session ? this.rotate(this.session) : this.session;
+  // Block old requests as soon as logout starts, even while refresh is finishing.
+  logout = () => {
+    this.signingOut = true;
+    this.epoch++;
+    return this.exclusive(async () => {
+      try {
+        if (this.session) await this.api.logout({ refreshToken: this.session.refreshToken });
+        await this.clear();
+      } finally { this.signingOut = false; }
     });
-    try {
-      return (await this.api.me(refreshed.accessToken, signal)).user;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        await this.exclusive(async () => {
-          if (this.session === refreshed) await this.clear('Your session expired. Please sign in again.');
-        });
-      }
-      throw error;
-    }
   };
+
+  // Reject results from an account that has signed out or been replaced.
+  isAuthorizationCurrent = (grant: AccessGrant) => !this.signingOut && this.session !== null && grant.epoch === this.epoch;
+
+  // Share token preparation so concurrent callers also share a failed refresh.
+  authorization = (expectedEpoch?: number): Promise<AccessGrant> => {
+    if (expectedEpoch !== undefined && expectedEpoch !== this.epoch) return Promise.reject(sessionEnded());
+    if (!this.pendingAuthorization) {
+      const pending = this.loadAuthorization();
+      this.pendingAuthorization = pending;
+      void pending.finally(() => { if (this.pendingAuthorization === pending) this.pendingAuthorization = null; }).catch(() => undefined);
+    }
+    return this.pendingAuthorization.then(grant => {
+      if (!this.isAuthorizationCurrent(grant) || (expectedEpoch !== undefined && expectedEpoch !== grant.epoch)) throw sessionEnded();
+      return grant;
+    });
+  };
+
+  // Read a token, refreshing it first if it is close to expiry.
+  private loadAuthorization = () => this.exclusive(async (): Promise<AccessGrant> => {
+    if (this.signingOut || !this.session) throw sessionEnded();
+    const epoch = this.epoch;
+    if (Date.parse(this.session.refreshExpiresAt) <= Date.now() || this.session.accessExpiresAt <= Date.now() + 30_000) {
+      await this.rotate(this.session);
+    }
+    if (this.signingOut || !this.session || epoch !== this.epoch) throw sessionEnded();
+    return { token: this.session.accessToken, epoch, version: this.version };
+  });
+
+  // Share a refresh between requests that failed with the same session version.
+  recoverAuthorization = (grant: AccessGrant): Promise<AccessGrant> => {
+    if (this.recovery?.epoch === grant.epoch && this.recovery.version === grant.version) return this.recovery.promise;
+    const promise = this.exclusive(async () => {
+      if (this.signingOut || !this.session || grant.epoch !== this.epoch) throw sessionEnded();
+      if (grant.version === this.version) await this.rotate(this.session);
+      if (this.signingOut || !this.session || grant.epoch !== this.epoch) throw sessionEnded();
+      return { token: this.session.accessToken, epoch: this.epoch, version: this.version };
+    });
+    const recovery = { epoch: grant.epoch, version: grant.version, promise };
+    this.recovery = recovery;
+    void promise.finally(() => { if (this.recovery === recovery) this.recovery = null; }).catch(() => undefined);
+    return promise;
+  };
+
+  // A failed retry may expire only the session that actually sent that request.
+  expireAuthorization = (grant: AccessGrant) => this.exclusive(async () => {
+    if (this.session && grant.epoch === this.epoch && grant.version === this.version) {
+      await this.clear('Your session expired. Please sign in again.');
+    }
+  });
+
+  // Profile uses the same authenticated client and retry rules as every other API.
+  profile = async (signal?: AbortSignal): Promise<PublicUser> => (await this.api.me(signal)).user;
 }
