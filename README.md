@@ -2,7 +2,7 @@
 
 A fantasy league platform for any sport or game. Creators define player pools and scoring rules; members build squads and compete in invite-only leagues.
 
-This Expo SDK 58 app supports email login, username/email registration, session restoration, and logout against the local API. Signed-in users land on a protected account screen. Pending states use the Reanimated hash loader; Google sign-in and password reset remain unavailable until the API supports them.
+This Expo SDK 58 app supports email login, username/email registration, session restoration, and logout against the local API. Signed-in users land on the protected Home dashboard, with account access from the avatar. Pending states use the Reanimated hash loader; Google sign-in and password reset remain unavailable until the API supports them.
 
 ## Development
 
@@ -58,7 +58,7 @@ Native refresh credentials are encrypted with Expo SecureStore and scoped to the
 
 SecureStore is a new native dependency, so rebuild the existing Android app with `bun run android` before using authentication. The existing Android manifest now references `@xml/secure_store_backup_rules` and `@xml/secure_store_data_extraction_rules` from SecureStore to exclude encrypted preferences from backup. The native directory is currently Git-ignored, so these native edits need to be retained alongside the prebuilt project. No native directories were regenerated and app.json is unchanged. The iOS project is currently absent and was not generated.
 
-Successful login or registration opens `/account`. The screen displays the profile, preserves known profile data during refresh errors, offers retry, and logs out using the latest refresh credential. If remote logout fails, the screen reports the error and allows another attempt. During restoration, “Clear saved sign-in” removes the local credential; it does not claim to revoke an unreachable server session.
+Successful login or registration opens `/home`; the avatar opens `/account`. The screen displays the profile, preserves known profile data during refresh errors, offers retry, and logs out using the latest refresh credential. If remote logout fails, the screen reports the error and allows another attempt. During restoration, “Clear saved sign-in” removes the local credential; it does not claim to revoke an unreachable server session.
 
 Verification covered the live API through the session controller with in-memory storage: registration, concurrent 401 recovery using one shared refresh, restoration, wrong-password rejection, logout, and rejection of a revoked credential. One local verification account (`codex_auth_mwj5663i`) remains; its sessions were logged out. Native encrypted persistence, device UI, navigation, and motion have not been exercised on a device.
 
@@ -101,3 +101,10 @@ Use `publicApiClient` for deliberately anonymous endpoints. Login, registration,
 Only HTTP 401 triggers reactive refresh. Network errors, timeouts, 403, 429, and server errors do not replay the original request. Invalid/expired refresh credentials clear the session; transient refresh failures preserve it for a later explicit attempt. A canceled waiter stops immediately without canceling refresh needed by other callers. Logout/account changes invalidate old requests and prevent replay under the new account, including stale successful responses. Stream bodies are not automatically replayed. Automatic POST retries assume the backend rejects unauthorized requests before applying side effects.
 
 The backend rotates refresh credentials without a documented recovery/grace endpoint. If the server consumes a credential but its refresh response is lost in transit, a later refresh can be rejected and require sign-in again; the client cannot recover that lost credential on its own.
+
+
+## Post-login UI
+
+Signed-in users now enter the four-tab dashboard at `/home`. The Home screen follows `after-login.html`, using local mock leagues, stats, scoring rules, and leaderboard data. Notifications and scoring details use Expo UI bottom sheets. Tap the avatar to reach the existing account/profile/logout screen.
+
+Checkpoint 1 provides Home and navigation. Squad, Matches, and Leagues are basic previews; their full layouts and actions are scheduled for the next checkpoints. League/match/squad content does not call the backend.

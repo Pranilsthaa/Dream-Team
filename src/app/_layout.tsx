@@ -51,10 +51,11 @@ function AuthNavigator() {
   if (session.status === 'restoring' || session.status === 'restore-error') return <SessionGate />;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
-      <Stack.Protected guard={session.status === 'signed-out'}>
+      <Stack.Protected guard={session.status === 'signed-out'} redirectTo="/home">
         <Stack.Screen name="index" />
       </Stack.Protected>
-      <Stack.Protected guard={session.status === 'signed-in'}>
+      <Stack.Protected guard={session.status === 'signed-in'} redirectTo="/">
+        <Stack.Screen name="(main)" />
         <Stack.Screen name="account" />
       </Stack.Protected>
     </Stack>

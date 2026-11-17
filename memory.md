@@ -176,3 +176,24 @@ Zustand migration validation: lint (zero warnings), TypeScript, git diff whitesp
 Shared auth recovery validation: controlled adapter/session checks above passed; lint (zero warnings), TypeScript, git diff whitespace checks, and Android/iOS/web bundle exports passed. Existing development-only response/error logging preference is preserved. No live account creation, backend mutations, or device actions were performed for this change.
 
 Button press feedback update: ActionButton now uses a stationary bottom depth layer and a face that moves down 3 points on press, covering the bottom edge. Reanimated transitions only translateY over 120ms; reduced motion applies the pressed position immediately. Removed press scale/opacity changes; disabled styling uses colors. Static container spacing preserves layout and the touch target. Existing user edits in action-button.tsx were preserved. Lint, typecheck, and whitespace checks passed; device appearance was not rechecked.
+
+
+## Post-login reference UI checkpoints (2026-11-17)
+
+Reference: `/Users/bright/Java/after-login.html`. Treat the HTML as visual/content reference; product direction remains multi-sport Dream-Team. User requested placeholder data, simple UI replication, @expo/ui bottom sheets, and checkpoints with review pauses. No API integration for league/squad/match content in this work.
+
+Reference contains Home, Squad, Matches, and Leagues tabs; avatar/greeting/notifications header; league picker; striped league stats hero; scoring rules; quick actions; live-match and leaderboard cards; squad pitch and captain/vice selectors; match filters; league list/invite codes; creation/join forms; and notification/scoring/player/admin sheets.
+
+Checkpoint 1: post-login shell and Home implementation. Added protected `(main)` route group (default Home) alongside the existing account route. Header/avatar opens account; bell opens Updates sheet. Bottom tabs use Expo Router JS tabs and existing forest/lime/cream theme, local Barlow fonts, and SVG line icons. Home replicates league chips, striped league summary, rank/points/round stats, static mock deadline, scoring rules, quick actions, live card, and three nearby leaderboard rows. Three sample leagues and scoring presets come from the supplied HTML.
+
+Sheets use universal `Host`, `BottomSheet`, and `RNHostView` imports from @expo/ui, already installed at SDK 58. Scoring and Updates sheets use native dismissal/drag behavior and theme colors. No new motion library or custom sheet animation. New icon rendering uses existing expo-image SVG support; no icon package added.
+
+Squad, Matches, and Leagues currently contain deliberately basic placeholder previews so the tabs and Home shortcuts have destinations. Home Create/Join/Add players shortcuts navigate to Leagues; full forms/actions are deferred. No edits to app.json, native projects, existing auth/session handling, or account/profile behavior. Mock data has no persistence.
+
+Next checkpoint (after review): full Squad pitch and player breakdown/captain selection, plus Matches cards and filters. Final checkpoint: Leagues join/create forms using React Hook Form, invite/admin actions, remaining sheets, and interaction polish. Preserve simple local placeholder state; no backend services for these screens yet.
+
+Expo SDK 58 removes initialRouteName from Tabs props; use `(main)/_layout.tsx` unstable_settings instead. Refreshed ignored generated route declarations with the installed Expo CLI setupTypedRoutes generator. A temporary offline dev-server attempt was stopped because port 8099 was already in use; no existing server was stopped.
+
+Post-login checkpoint 1 validation: lint (zero warnings), typecheck after Expo route declaration regeneration, git diff whitespace checks, and iOS/Android/web bundle exports passed. Device appearance and native sheet interactions were not verified. Paused for user review before checkpoint 2.
+
+Dashboard login-routing correction: user reported an unmatched route immediately after successful login. Added explicit SDK 58 Stack.Protected redirectTo destinations in the root layout: the signed-out-only index route redirects to /home once signed in; the signed-in-only dashboard/account group redirects to / when signed out. This avoids relying on the root default anchor after the login route becomes unavailable. Lint, typecheck, and whitespace checks passed. Device transition has not been rechecked; checkpoint 2 remains pending.
