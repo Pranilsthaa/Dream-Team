@@ -70,6 +70,7 @@ function AuthNavigator() {
         <Stack.Screen name="account" />
         <Stack.Screen name="workspace" />
         <Stack.Screen name="manage-matches" />
+        <Stack.Screen name="score-match" />
       </Stack.Protected>
     </Stack>
   );

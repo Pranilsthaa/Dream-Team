@@ -1,7 +1,6 @@
 import { apiClient } from "@/lib/api/client";
-import { ApiError } from "@/lib/api/api-error";
 import { useAuth } from "@/providers/auth-provider";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import type { Page } from "./api";
 
 export type Team = { id: string; name: string; code: string; logo: string | null };
@@ -27,23 +26,5 @@ export function useSetupList<T>(path: string, enabled = true) {
     queryFn: async ({ pageParam, signal }) =>
       (await apiClient.get<Page<T>>(path, { params: { page: pageParam }, signal })).data,
     getNextPageParam: (last) => last.data.length === last.pageSize ? last.page + 1 : undefined,
-  });
-}
-
-export function useLineupStatus(path: string, enabled: boolean) {
-  const { session } = useAuth();
-  return useQuery({
-    queryKey: ["lineup-status", session.user?.id, path],
-    enabled: enabled && session.status === "signed-in",
-    queryFn: async ({ signal }) => {
-      try {
-        return (await apiClient.get<{ overs: number }>(path, { signal })).data;
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 404 && error.message === "Scorecard has not been set up") {
-          return null;
-        }
-        throw error;
-      }
-    },
   });
 }

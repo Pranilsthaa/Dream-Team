@@ -1,14 +1,19 @@
 import { ActionButton } from "@/components/action-button";
 import { useLeagues } from "@/features/leagues/hooks";
 import { QueryState } from "@/screens/dashboard/query-state";
-import { dashboardStyles as shared, SectionHeading } from "@/screens/dashboard/ui";
+import {
+  SectionHeading,
+  dashboardStyles as shared,
+} from "@/screens/dashboard/ui";
 import { Redirect, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export function WorkspaceScreen() {
   const leagues = useLeagues();
   if (leagues.data) {
-    const managesLeague = leagues.data.pages.some((page) => page.data.length > 0);
+    const managesLeague = leagues.data.pages.some(
+      (page) => page.data.length > 0,
+    );
     return <Redirect href={managesLeague ? "/manage-matches" : "/home"} />;
   }
   return (

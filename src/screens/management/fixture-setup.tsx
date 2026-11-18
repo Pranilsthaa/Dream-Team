@@ -4,12 +4,12 @@ import { ActionButton } from "@/components/action-button";
 import type { Tournament } from "@/features/leagues/api";
 import {
   tournamentPath,
-  useLineupStatus,
   useSetupList,
   type Registration,
   type Team,
 } from "@/features/leagues/match-setup";
 import type { Fixture } from "@/features/leagues/schedule";
+import { scorecardPath, useStaffScorecard } from "@/features/leagues/scoring";
 import { QueryState } from "@/screens/dashboard/query-state";
 import { dashboardStyles as shared } from "@/screens/dashboard/ui";
 import { PageState } from "./roster-panel";
@@ -31,7 +31,7 @@ export function FixtureSetup({
   const path = tournamentPath(tournament.leagueId, tournament.id);
   if (editor.kind === "lineup") {
     return (
-      <LineupSetup path={path} fixture={editor.fixture} onSaved={onSaved} />
+      <LineupSetup tournament={tournament} path={path} fixture={editor.fixture} onSaved={onSaved} />
     );
   }
   return (
@@ -124,16 +124,18 @@ function FixtureForm({
 }
 
 function LineupSetup({
+  tournament,
   path,
   fixture,
   onSaved,
 }: {
+  tournament: Tournament;
   path: string;
   fixture: Fixture;
   onSaved: () => void;
 }) {
-  const scorecard = `${path}/schedule/fixtures/${fixture.id}/scorecard`;
-  const status = useLineupStatus(scorecard, true);
+  const scorecard = scorecardPath(tournament.leagueId, tournament.id, fixture.id);
+  const status = useStaffScorecard(scorecard);
   const rosterQuery = useSetupList<Registration>(
     `${path}/players`,
     status.data === null,

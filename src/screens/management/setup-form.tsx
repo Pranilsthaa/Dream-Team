@@ -1,14 +1,14 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { Controller, useForm, type UseFormReturn } from "react-hook-form";
 import { StyleSheet, Text, View } from "react-native";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { DateTimeField } from "@/components/date-time-field";
 import { ActionButton } from "@/components/action-button";
+import { DateTimeField } from "@/components/date-time-field";
 import { theme } from "@/constants/theme";
 import { apiClient } from "@/lib/api/client";
 import { AuthField } from "@/screens/auth/auth-field";
-import { dashboardStyles as shared, LeagueChips } from "@/screens/dashboard/ui";
+import { LeagueChips, dashboardStyles as shared } from "@/screens/dashboard/ui";
 
 type Values = Record<string, string | string[]>;
 type Choice = { id: string; name: string };
@@ -36,7 +36,11 @@ export type Field = {
   validate?: (value: string) => boolean | string;
 };
 
-export function SetupForm({ action, onSaved, validate }: {
+export function SetupForm({
+  action,
+  onSaved,
+  validate,
+}: {
   action: SetupAction;
   onSaved: () => void;
   validate?: (values: Values) => string | undefined;
@@ -45,15 +49,22 @@ export function SetupForm({ action, onSaved, validate }: {
   const submitting = useRef(false);
   const mutation = useMutation({
     mutationFn: async (values: Values) => {
-      await apiClient.request({ method: action.method, url: action.path, data: action.body?.(values) });
+      await apiClient.request({
+        method: action.method,
+        url: action.path,
+        data: action.body?.(values),
+      });
     },
     retry: false,
     networkMode: "always",
   });
   const form = useForm<Values>({
-    defaultValues: Object.fromEntries((action.fields ?? []).map((field) => [
-      field.key, field.multiple ? [] : field.initial ?? "",
-    ])),
+    defaultValues: Object.fromEntries(
+      (action.fields ?? []).map((field) => [
+        field.key,
+        field.multiple ? [] : (field.initial ?? ""),
+      ]),
+    ),
   });
   const submit = form.handleSubmit(async (values) => {
     form.clearErrors("root");
@@ -65,11 +76,20 @@ export function SetupForm({ action, onSaved, validate }: {
     try {
       await mutation.mutateAsync(values);
     } catch (error) {
-      form.setError("root", { message: error instanceof Error ? error.message : "Could not save changes." });
+      form.setError("root", {
+        message:
+          error instanceof Error ? error.message : "Could not save changes.",
+      });
       return;
     }
     await queryClient.invalidateQueries({
-      predicate: (query) => ["match-setup", "staff-schedule", "lineup-status", "tournaments"].includes(String(query.queryKey[0])),
+      predicate: (query) =>
+        [
+          "match-setup",
+          "staff-schedule",
+          "lineup-status",
+          "tournaments",
+        ].includes(String(query.queryKey[0])),
     });
     onSaved();
   });
@@ -77,20 +97,41 @@ export function SetupForm({ action, onSaved, validate }: {
   const error = form.formState.errors.root?.message;
   return (
     <View style={styles.form}>
-      {action.fields?.map((field) => <SetupField key={field.key} field={field} form={form} busy={busy} />)}
-      {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-      <ActionButton loading={busy} onPress={async () => {
-        if (submitting.current) return;
-        submitting.current = true;
-        try { await submit(); } finally { submitting.current = false; }
-      }}>
+      {action.fields?.map((field) => (
+        <SetupField key={field.key} field={field} form={form} busy={busy} />
+      ))}
+      {error ? (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
+      <ActionButton
+        loading={busy}
+        onPress={async () => {
+          if (submitting.current) return;
+          submitting.current = true;
+          try {
+            await submit();
+          } finally {
+            submitting.current = false;
+          }
+        }}
+      >
         {action.submitLabel ?? "Save"}
       </ActionButton>
     </View>
   );
 }
 
-function SetupField({ field, form, busy }: { field: Field; form: UseFormReturn<Values>; busy: boolean }) {
+function SetupField({
+  field,
+  form,
+  busy,
+}: {
+  field: Field;
+  form: UseFormReturn<Values>;
+  busy: boolean;
+}) {
   if (field.dateTime) {
     return (
       <Controller
@@ -120,11 +161,13 @@ function SetupField({ field, form, busy }: { field: Field; form: UseFormReturn<V
         autoCapitalize="none"
         maxLength={field.maxLength}
         keyboardType={field.number ? "number-pad" : "default"}
-        rules={{ validate: (input) => {
-          const value = String(input).trim();
-          if (!value) return field.optional || "Required.";
-          return field.validate?.(value) ?? true;
-        } }}
+        rules={{
+          validate: (input) => {
+            const value = String(input).trim();
+            if (!value) return field.optional || "Required.";
+            return field.validate?.(value) ?? true;
+          },
+        }}
       />
     );
   }
@@ -133,20 +176,33 @@ function SetupField({ field, form, busy }: { field: Field; form: UseFormReturn<V
     <Controller
       control={form.control}
       name={field.key}
-      rules={{ validate: (value) => {
-        if (field.multiple && Array.isArray(value)) {
-          if (value.length < field.multiple.min) return `Select at least ${field.multiple.min} players.`;
-          return (value.length <= field.multiple.max && value.every((id) => choices.some((item) => item.id === id)))
-            || "Review the selected players.";
-        }
-        return choices.some((item) => item.id === value) || "Select an option.";
-      } }}
+      rules={{
+        validate: (value) => {
+          if (field.multiple && Array.isArray(value)) {
+            if (value.length < field.multiple.min)
+              return `Select at least ${field.multiple.min} players.`;
+            return (
+              (value.length <= field.multiple.max &&
+                value.every((id) => choices.some((item) => item.id === id))) ||
+              "Review the selected players."
+            );
+          }
+          return (
+            choices.some((item) => item.id === value) || "Select an option."
+          );
+        },
+      }}
       render={({ field: input, fieldState }) => {
-        const selected = Array.isArray(input.value) ? input.value : [input.value];
+        const selected = Array.isArray(input.value)
+          ? input.value
+          : [input.value];
         return (
           <View>
             <Text style={shared.body}>
-              {field.label}{field.multiple ? ` · ${selected.length}/${field.multiple.max}` : ""}
+              {field.label}
+              {field.multiple
+                ? ` · ${selected.length}/${field.multiple.max}`
+                : ""}
             </Text>
             <LeagueChips
               items={choices}
@@ -154,11 +210,17 @@ function SetupField({ field, form, busy }: { field: Field; form: UseFormReturn<V
               onSelect={(id) => {
                 if (busy) return;
                 if (!field.multiple) input.onChange(id);
-                else if (selected.includes(id)) input.onChange(selected.filter((item) => item !== id));
-                else if (selected.length < field.multiple.max) input.onChange([...selected, id]);
+                else if (selected.includes(id))
+                  input.onChange(selected.filter((item) => item !== id));
+                else if (selected.length < field.multiple.max)
+                  input.onChange([...selected, id]);
               }}
             />
-            {fieldState.error ? <Text accessibilityRole="alert" style={styles.error}>{fieldState.error.message}</Text> : null}
+            {fieldState.error ? (
+              <Text accessibilityRole="alert" style={styles.error}>
+                {fieldState.error.message}
+              </Text>
+            ) : null}
           </View>
         );
       }}
@@ -167,12 +229,16 @@ function SetupField({ field, form, busy }: { field: Field; form: UseFormReturn<V
 }
 
 export function integerBetween(min: number, max: number) {
-  return (value: string) => (
-    /^\d+$/.test(value) && Number(value) >= min && Number(value) <= max
-  ) || `Enter a whole number from ${min} to ${max}.`;
+  return (value: string) =>
+    (/^\d+$/.test(value) && Number(value) >= min && Number(value) <= max) ||
+    `Enter a whole number from ${min} to ${max}.`;
 }
 
 const styles = StyleSheet.create({
   form: { gap: 14 },
-  error: { color: theme.colors.warning, fontFamily: theme.fonts.label, fontSize: 14 },
+  error: {
+    color: theme.colors.warning,
+    fontFamily: theme.fonts.label,
+    fontSize: 14,
+  },
 });
