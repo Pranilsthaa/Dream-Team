@@ -61,13 +61,15 @@ function AuthNavigator() {
     >
       <Stack.Protected
         guard={session.status === "signed-out"}
-        redirectTo="/home"
+        redirectTo="/workspace"
       >
         <Stack.Screen name="index" />
       </Stack.Protected>
       <Stack.Protected guard={session.status === "signed-in"} redirectTo="/">
         <Stack.Screen name="(main)" />
         <Stack.Screen name="account" />
+        <Stack.Screen name="workspace" />
+        <Stack.Screen name="manage-matches" />
       </Stack.Protected>
     </Stack>
   );

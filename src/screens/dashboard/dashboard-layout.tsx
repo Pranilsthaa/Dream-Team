@@ -1,13 +1,15 @@
+import { BottomSheet } from "@/components/bottom-sheet";
 import { theme } from "@/constants/theme";
+import { useLeagues } from "@/features/leagues/hooks";
 import { useAuth } from "@/providers/auth-provider";
 import { router } from "expo-router";
 import { Tabs } from "expo-router/js-tabs";
 import { StatusBar } from "expo-status-bar";
+import { ClipboardList } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DashboardIcon, type IconName } from "./icon";
-import { BottomSheet } from "@/components/bottom-sheet";
 import { Card, dashboardStyles as shared } from "./ui";
 
 const tabs: { route: string; label: string; icon: IconName }[] = [
@@ -20,6 +22,8 @@ const tabs: { route: string; label: string; icon: IconName }[] = [
 export function DashboardLayout() {
   const { top } = useSafeAreaInsets();
   const { session } = useAuth();
+  const leagues = useLeagues();
+  const managesLeague = leagues.data?.pages.some((page) => page.data.length > 0);
   const username = session.user?.username ?? "Captain";
   const [updatesOpen, setUpdatesOpen] = useState(false);
   return (
@@ -41,6 +45,16 @@ export function DashboardLayout() {
             <Text style={styles.small}>Welcome back</Text>
             <Text style={styles.name}>{username}</Text>
           </View>
+          {managesLeague ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open Match Manager"
+              onPress={() => router.navigate("/manage-matches")}
+              style={styles.bell}
+            >
+              <ClipboardList color={theme.colors.accent} size={22} />
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Notifications"

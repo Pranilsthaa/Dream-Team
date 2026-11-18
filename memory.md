@@ -226,3 +226,28 @@ Migrated notifications, Home actions/scoring, player detail/captain actions, and
 No app.json or native project changes; existing Android new architecture/autolinking is already enabled, and iOS is absent. A new native Android build is required before using True Sheet. An attempted Gradle build was blocked by sandbox cache access; the escalation request was declined by the user, so compilation/install/device checks were not retried. Lint, typecheck, and whitespace checks passed. Final bundle/autolinking results follow below.
 
 True Sheet migration final verification: Android/iOS/web exports passed after adding the documented web peers and provider. Expo's Android react-native-config autolinking command also completed successfully with True Sheet included. Native compilation and device interaction remain unverified. Paused before the next product checkpoint.
+
+### Match management checkpoint 1 — demo and API review (2026-11-18)
+
+Reviewed `admin-match-management-demo.html` as a UX reference and fetched `http://127.0.0.1:3001/api/docs-json` as the API contract. The demo covers a filterable match centre, lineup and toss setup, ball-by-ball scoring with extras/wickets and undo, innings transitions, scorecards, and a fantasy points preview. Its seeded records, scoring calculations, and publish toast are prototype behavior. Production should use the backend for scorecard state, cricket validation, and official results. Cricket is the first supported scoring format.
+
+The API supports league teams and players, tournament enrollment and registration, fixture scheduling and schedule publication, lineups and overs, innings and delivery recording, undo, scorecard corrections, official result publication, and public results/standings/player reports. It has no dedicated toss field or fantasy-points publication API. Use the toss choice to select the first batting side during setup, and label official scorecard publication separately from fantasy points. The backend returns versioned staff scorecards. Serialize writes per fixture, refresh on a conflict or ambiguous response, and require explicit review before retrying a delivery.
+
+Recommended access model: use league-scoped owner/admin/scorer permissions for the management workspace. The global auth `user`/`admin` role is distinct from these permissions. The existing league list confirms ownership or active staff membership but does not distinguish admin from scorer. Compare `ownerId` for owners and add a server-provided current-user membership role or capabilities before exposing elevated controls to non-owner staff. The owner-only staff list cannot supply this for all users. Keep the current fantasy dashboard as the default for users without managed leagues. For users with both activities, allow a switch back to the fantasy dashboard. The server remains authoritative for reads and mutations.
+
+Proposed review checkpoints after discovery:
+
+1. Management entry and role routing, league/tournament selection, and Match Centre backed by the tournament schedule.
+2. Team/player catalogue and tournament registration, then fixture creation, editing, schedule publication, and lineup setup. Show controls according to league permissions and fixture status.
+3. Live scoring, innings transitions, undo, scorecard reads, reconnect and conflict handling.
+4. Official result publication, corrections, results, standings, and player reports. Connect fantasy points when a server contract becomes available.
+
+Pause after each checkpoint. Discovery used read-only access and made no app code changes or API writes.
+
+### Match management checkpoint 2 — workspace entry and live fixture list
+
+The signed-out route now redirects to `/workspace` after authentication. It uses the existing authenticated league list, whose contract includes owned leagues and active staff memberships. A nonempty list opens `/manage-matches`. An empty list opens the fantasy dashboard. If access cannot be resolved, users can retry or open fantasy. The manager rechecks league access on entry and redirects users with no managed leagues to fantasy. Eligible users can switch modes from either workspace. Global account role does not grant league access.
+
+Match Centre reads the paginated staff schedule for the selected league and tournament through Axios and TanStack Query. It shows fixture dates in the tournament timezone, schedule publication status, fixture statuses, and filters over loaded pages. League owners are identified by owner ID and other eligible users are labeled league staff. The API still needs a current-user role or capability field to distinguish admins from scorers for elevated actions. Fixture editing, roster/setup tools, and scoring belong to the following checkpoints.
+
+Lint, TypeScript, whitespace checks, and Android/iOS/web bundle exports passed. Device navigation and authenticated staff schedule reads remain unverified. Pause for review before roster and fixture setup.
