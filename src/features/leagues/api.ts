@@ -3,6 +3,7 @@ import { apiClient, publicApiClient } from "@/lib/api/client";
 export type League = {
   id: string;
   ownerId: string;
+  viewerRole?: "owner" | "admin" | "scorer";
   name: string;
   slug: string;
   sport: "cricket";

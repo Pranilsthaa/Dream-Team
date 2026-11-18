@@ -4,14 +4,21 @@ import { CalendarDays, ClipboardList } from "lucide-react-native";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BottomSheet } from "@/components/bottom-sheet";
 import { ActionButton } from "@/components/action-button";
 import { theme } from "@/constants/theme";
-import type { League } from "@/features/leagues/api";
+import type { League, Tournament } from "@/features/leagues/api";
 import { useSelectedLeague, useTournaments } from "@/features/leagues/hooks";
-import { useStaffSchedule } from "@/features/leagues/schedule";
+import { tournamentPath } from "@/features/leagues/match-setup";
+import { useStaffSchedule, type Fixture } from "@/features/leagues/schedule";
 import { useAuth } from "@/providers/auth-provider";
 import { QueryState } from "@/screens/dashboard/query-state";
 import { Card, dashboardStyles as shared, LeagueChips, SectionHeading } from "@/screens/dashboard/ui";
+
+import { LeagueForm } from "@/screens/dashboard/league-form";
+import { FixtureSetup, type FixtureEditor } from "./fixture-setup";
+import { RosterPanel } from "./roster-panel";
+import { SetupForm, type SetupAction } from "./setup-form";
 
 const filters = [
   { id: "all", name: "All" },
@@ -24,6 +31,9 @@ const filters = [
 export function MatchCentreScreen() {
   const { session } = useAuth();
   const { league, leagues, query, select } = useSelectedLeague();
+
+  const role = league && league.ownerId === session.user?.id ? "owner" : league?.viewerRole;
+  const canManage = role === "owner" || role === "admin";
 
   if (query.isSuccess && !league) return <Redirect href="/home" />;
 
@@ -68,9 +78,9 @@ export function MatchCentreScreen() {
               </ActionButton>
             ) : null}
             <Text style={shared.body}>
-              {league.ownerId === session.user?.id ? "League owner" : "League staff"}
+              {role ? `League ${role}` : "League staff"}
             </Text>
-            <TournamentSchedule key={league.id} league={league} />
+            <TournamentSchedule key={league.id} league={league} canManage={canManage} />
           </>
         ) : null}
       </ScrollView>
@@ -78,7 +88,8 @@ export function MatchCentreScreen() {
   );
 }
 
-function TournamentSchedule({ league }: { league: League }) {
+function TournamentSchedule({ league, canManage }: { league: League; canManage: boolean }) {
+  const [creating, setCreating] = useState(false);
   const query = useTournaments(league.id);
   const [selected, setSelected] = useState<string>();
   const tournaments = query.data?.pages.flatMap((page) => page.data) ?? [];
@@ -87,8 +98,8 @@ function TournamentSchedule({ league }: { league: League }) {
   return (
     <>
       <SectionHeading
-        action={tournament ? "Refresh" : undefined}
-        onPress={() => void query.refetch()}
+        action={canManage ? "+ Tournament" : tournament ? "Refresh" : undefined}
+        onPress={() => canManage ? setCreating(true) : void query.refetch()}
       >
         Tournament
       </SectionHeading>
@@ -112,18 +123,42 @@ function TournamentSchedule({ league }: { league: League }) {
               More tournaments
             </ActionButton>
           ) : null}
-          <FixtureList key={tournament.id} leagueId={league.id} tournamentId={tournament.id} />
+          <FixtureList key={tournament.id} tournament={tournament} canManage={canManage} />
         </>
+      ) : null}
+      {canManage ? (
+        <BottomSheet open={creating} onClose={() => setCreating(false)} title="Create tournament">
+          {creating ? <LeagueForm editor={{ kind: "tournament", leagueId: league.id }} onDone={() => setCreating(false)} /> : null}
+        </BottomSheet>
       ) : null}
     </>
   );
 }
 
-function FixtureList({ leagueId, tournamentId }: { leagueId: string; tournamentId: string }) {
-  const query = useStaffSchedule(leagueId, tournamentId);
+function FixtureList({ tournament, canManage }: { tournament: Tournament; canManage: boolean }) {
+  const query = useStaffSchedule(tournament.leagueId, tournament.id);
+  const path = tournamentPath(tournament.leagueId, tournament.id);
+  const [editor, setEditor] = useState<SetupAction | FixtureEditor | null>(null);
+  const canEditSchedule = canManage && tournament.status !== "completed" && tournament.status !== "archived";
   const [filter, setFilter] = useState("all");
   const schedule = query.data?.pages[0];
   const fixtures = query.data?.pages.flatMap((page) => page.data) ?? [];
+  const published = Boolean(schedule?.publishedAt);
+  const showStatusAction = (fixture: Fixture, status: "live" | "cancelled") => {
+    const title = status === "live" ? "Mark match live" : "Cancel match";
+    setEditor({
+      title,
+      description: `Update the published status for match ${fixture.matchNumber}.`,
+      method: "patch",
+      path: `${path}/schedule/fixtures/${fixture.id}/status`,
+      body: () => ({ status }),
+      submitLabel: title,
+    });
+  };
+  const editorTitle = editor && ("title" in editor ? editor.title
+    : editor.kind === "lineup" ? `Lineups · Match ${editor.fixture.matchNumber}`
+    : editor.fixture ? "Edit fixture" : "New fixture");
+  const closeAfterSave = () => setEditor((current) => current === editor ? null : current);
   const visible = fixtures.filter(({ status }) =>
     filter === "all" || status === filter || (filter === "upcoming" && status === "locked"),
   );
@@ -135,7 +170,20 @@ function FixtureList({ leagueId, tournamentId }: { leagueId: string; tournamentI
 
   return (
     <>
+      <RosterPanel tournament={tournament} canManage={canManage} onAction={setEditor} />
       <SectionHeading action="Refresh" onPress={() => void query.refetch()}>Fixtures</SectionHeading>
+      {canEditSchedule && schedule ? (
+        <View style={styles.list}>
+          <ActionButton onPress={() => setEditor({ kind: "fixture" })}>New fixture</ActionButton>
+          {!published && fixtures.length ? (
+            <ActionButton variant="secondary" onPress={() => setEditor({
+              title: "Publish schedule",
+              description: "Make this tournament’s fixture schedule publicly available.",
+              method: "put", path: `${path}/schedule/publish`, submitLabel: "Publish schedule",
+            })}>Publish schedule</ActionButton>
+          ) : null}
+        </View>
+      ) : null}
       {schedule ? (
         <>
           <Text style={shared.body}>
@@ -165,6 +213,25 @@ function FixtureList({ leagueId, tournamentId }: { leagueId: string; tournamentI
               <Text style={shared.body}>{dateFormat?.format(new Date(fixture.date))}</Text>
             </View>
             <Text style={shared.body}>{fixture.venue}</Text>
+            {published && (fixture.status === "upcoming" || fixture.status === "live") ? (
+              <SectionHeading action="Lineups" onPress={() => setEditor({ kind: "lineup", fixture })}>Match setup</SectionHeading>
+            ) : null}
+            {canEditSchedule && fixture.status === "upcoming" ? (
+              <ActionButton variant="secondary" onPress={() => setEditor({ kind: "fixture", fixture })}>Edit fixture</ActionButton>
+            ) : null}
+            {canEditSchedule && !published && fixture.status === "upcoming" ? (
+              <ActionButton variant="secondary" onPress={() => setEditor({
+                title: "Delete fixture",
+                description: `Delete match ${fixture.matchNumber} from the unpublished schedule.`,
+                method: "delete", path: `${path}/schedule/fixtures/${fixture.id}`, submitLabel: "Delete fixture",
+              })}>Delete fixture</ActionButton>
+            ) : null}
+            {canEditSchedule && published && fixture.status === "upcoming" ? (
+              <ActionButton onPress={() => showStatusAction(fixture, "live")}>Mark live</ActionButton>
+            ) : null}
+            {canEditSchedule && published && (fixture.status === "upcoming" || fixture.status === "live") ? (
+              <ActionButton variant="secondary" onPress={() => showStatusAction(fixture, "cancelled")}>Cancel match</ActionButton>
+            ) : null}
           </Card>
         ))}
       </View>
@@ -173,6 +240,16 @@ function FixtureList({ leagueId, tournamentId }: { leagueId: string; tournamentI
           More fixtures
         </ActionButton>
       ) : null}
+      <BottomSheet
+        open={editor !== null}
+        onClose={() => setEditor(null)}
+        title={editorTitle || ""}
+        description={editor && "description" in editor ? editor.description : undefined}
+      >
+        {editor && ("method" in editor
+          ? <SetupForm key={editor.path + editor.title} action={editor} onSaved={closeAfterSave} />
+          : <FixtureSetup key={editor.kind + editor.fixture?.id} tournament={tournament} editor={editor} onSaved={closeAfterSave} />)}
+      </BottomSheet>
     </>
   );
 }

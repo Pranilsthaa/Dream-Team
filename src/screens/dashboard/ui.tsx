@@ -43,7 +43,7 @@ export function LeagueChips({
   onSelect,
   items,
 }: {
-  selected?: string;
+  selected?: string | string[];
   onSelect: (id: string) => void;
   items: { id: string; name: string }[];
 }) {
@@ -57,14 +57,14 @@ export function LeagueChips({
         <Pressable
           key={league.id}
           accessibilityRole="button"
-          accessibilityState={{ selected: selected === league.id }}
+          accessibilityState={{ selected: (Array.isArray(selected) ? selected.includes(league.id) : selected === league.id) }}
           onPress={() => onSelect(league.id)}
-          style={[styles.chip, selected === league.id && styles.selectedChip]}
+          style={[styles.chip, (Array.isArray(selected) ? selected.includes(league.id) : selected === league.id) && styles.selectedChip]}
         >
           <Text
             style={[
               styles.chipText,
-              selected === league.id && styles.selectedText,
+              (Array.isArray(selected) ? selected.includes(league.id) : selected === league.id) && styles.selectedText,
             ]}
           >
             {league.name}

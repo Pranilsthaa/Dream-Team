@@ -251,3 +251,11 @@ The signed-out route now redirects to `/workspace` after authentication. It uses
 Match Centre reads the paginated staff schedule for the selected league and tournament through Axios and TanStack Query. It shows fixture dates in the tournament timezone, schedule publication status, fixture statuses, and filters over loaded pages. League owners are identified by owner ID and other eligible users are labeled league staff. The API still needs a current-user role or capability field to distinguish admins from scorers for elevated actions. Fixture editing, roster/setup tools, and scoring belong to the following checkpoints.
 
 Lint, TypeScript, whitespace checks, and Android/iOS/web bundle exports passed. Device navigation and authenticated staff schedule reads remain unverified. Pause for review before roster and fixture setup.
+
+### Match management checkpoint 3 — roster, fixtures, and lineup setup
+
+The backend league list in the sibling `b` workspace now includes `viewerRole` for each owned league or active membership. It uses existing membership records and needs no database migration. Owner/admin controls depend on that role. Owner ID remains compatible with older API responses. The running API must load the updated backend source or build for non-owner admins to see management controls.
+
+Match Centre now supports tournament creation, creating and editing league teams and players, draft tournament enrollment and registration changes, fixture creation and editing, unpublished fixture deletion, schedule publication, and published fixture live/cancel transitions. Fixture dates use explicit-offset ISO timestamps. Staff can confirm lineups for published upcoming/live fixtures with 2–11 active registrations per team and 1–50 overs. Lineup setup checks the staff scorecard before offering the form. Existing lineups are shown as confirmed. The main forms use React Hook Form and the shared True Sheet component. Axios uses the shared authenticated client and TanStack Query refreshes affected reads after a successful write.
+
+Both TypeScript checks, app lint, Android/iOS/web exports, and the backend Swagger and cricket suites passed. No authenticated write round-trip or device interaction was performed. Pause before live scoring. Toss and opening-batter selection belong to the innings-start flow.
