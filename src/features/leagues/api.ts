@@ -27,6 +27,8 @@ export type TournamentInput = {
   name: string;
   season: string;
   timezone?: string;
+  startsAt?: string;
+  endsAt?: string;
 };
 export type Match = {
   id: string;
@@ -71,6 +73,8 @@ export const leagueApi = {
       name: input.name.trim(),
       season: input.season.trim(),
       ...(input.timezone ? { timezone: input.timezone } : {}),
+      ...(input.startsAt ? { startsAt: input.startsAt } : {}),
+      ...(input.endsAt ? { endsAt: input.endsAt } : {}),
     };
     const path = `/leagues/${leagueId}/tournaments`;
     return (

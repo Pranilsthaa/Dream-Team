@@ -86,9 +86,9 @@ function FixtureForm({
       { key: "venue", label: "Venue", initial: fixture?.venue, maxLength: 50 },
       {
         key: "date",
-        label: "Start date and time with offset",
+        label: "Start date and time",
         initial: fixture?.date,
-        validate: validFixtureDate,
+        dateTime: { displayTimezone: timezone },
       },
     ],
     body: ({ team1Id, team2Id, matchNumber, venue, date }) => ({
@@ -96,7 +96,7 @@ function FixtureForm({
       team2Id,
       matchNumber: Number(matchNumber),
       venue: String(venue).trim(),
-      date: new Date(String(date).trim()).toISOString(),
+      date: String(date),
     }),
   };
   return (
@@ -107,19 +107,13 @@ function FixtureForm({
         more="More enrolled teams"
       />
       {teams.length >= 2 ? (
-        <>
-          <Text style={shared.body}>
-            Tournament timezone is {timezone}. Use an ISO timestamp such as
-            2026-12-01T18:30+05:45 or the equivalent UTC time.
-          </Text>
-          <SetupForm
-            action={action}
-            validate={({ team1Id, team2Id }) =>
-              team1Id === team2Id ? "Select two different teams." : undefined
-            }
-            onSaved={onSaved}
-          />
-        </>
+        <SetupForm
+          action={action}
+          validate={({ team1Id, team2Id }) =>
+            team1Id === team2Id ? "Select two different teams." : undefined
+          }
+          onSaved={onSaved}
+        />
       ) : query.data && teams.length === 1 ? (
         <Text style={shared.body}>
           Enroll a second team to create a fixture.
@@ -127,18 +121,6 @@ function FixtureForm({
       ) : null}
     </>
   );
-}
-
-function validFixtureDate(value: string) {
-  const match =
-    /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(
-      value,
-    );
-  const timestamp = Date.parse(value);
-  const message = "Enter a valid date and time with an explicit UTC offset.";
-  if (!match || !Number.isFinite(timestamp)) return message;
-  const day = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00Z`);
-  return day.getUTCDate() === Number(match[3]) || message;
 }
 
 function LineupSetup({

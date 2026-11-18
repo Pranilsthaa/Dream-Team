@@ -3,6 +3,7 @@ import { Controller, useForm, type UseFormReturn } from "react-hook-form";
 import { StyleSheet, Text, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { DateTimeField } from "@/components/date-time-field";
 import { ActionButton } from "@/components/action-button";
 import { theme } from "@/constants/theme";
 import { apiClient } from "@/lib/api/client";
@@ -30,6 +31,7 @@ export type Field = {
   multiple?: { min: number; max: number };
   maxLength?: number;
   number?: boolean;
+  dateTime?: { displayTimezone: string };
   optional?: boolean;
   validate?: (value: string) => boolean | string;
 };
@@ -89,6 +91,25 @@ export function SetupForm({ action, onSaved, validate }: {
 }
 
 function SetupField({ field, form, busy }: { field: Field; form: UseFormReturn<Values>; busy: boolean }) {
+  if (field.dateTime) {
+    return (
+      <Controller
+        control={form.control}
+        name={field.key}
+        rules={{ required: "Choose a date and time." }}
+        render={({ field: input, fieldState }) => (
+          <DateTimeField
+            label={field.label}
+            value={String(input.value)}
+            onChange={input.onChange}
+            displayTimezone={field.dateTime?.displayTimezone}
+            disabled={busy}
+            error={fieldState.error?.message}
+          />
+        )}
+      />
+    );
+  }
   if (!field.choices) {
     return (
       <AuthField
