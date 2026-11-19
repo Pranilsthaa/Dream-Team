@@ -1,6 +1,8 @@
-import { useState } from "react";
-import { Text, View } from "react-native";
+import { ArrowLeft, ChevronDown, ChevronRight } from "lucide-react-native";
+import { useState, type ReactNode } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { theme } from "@/constants/theme";
 import { ActionButton } from "@/components/action-button";
 import type { Tournament } from "@/features/leagues/api";
 import {
@@ -14,73 +16,42 @@ import {
 import { QueryState } from "@/screens/dashboard/query-state";
 import {
   Card,
-  LeagueChips,
   SectionHeading,
   dashboardStyles as shared,
 } from "@/screens/dashboard/ui";
+import { EmptyCard, TeamBadge } from "./match-centre-ui";
 import { integerBetween, type SetupAction } from "./setup-form";
 
-export function RosterPanel({
-  tournament,
-  canManage,
-  onAction,
-  defaultExpanded = false,
-}: {
+type Props = {
   tournament: Tournament;
   canManage: boolean;
   onAction: (action: SetupAction) => void;
-  defaultExpanded?: boolean;
+};
+
+export type RosterView = "roster" | "teams" | "players";
+
+export function RosterPanel({ view, onNavigate, ...props }: Props & {
+  view: RosterView;
+  onNavigate: () => void;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  return (
-    <>
-      <SectionHeading
-        action={expanded ? "Hide" : "Open"}
-        onPress={() => setExpanded(!expanded)}
-      >
-        Teams and players
-      </SectionHeading>
-      {expanded ? (
-        <RosterContents
-          tournament={tournament}
-          canManage={canManage}
-          onAction={onAction}
-        />
-      ) : null}
-    </>
-  );
+  if (view === "teams" && props.canManage) return <LeagueTeams {...props} />;
+  if (view === "players" && props.canManage) return <LeaguePlayers {...props} />;
+  return <TournamentRoster {...props} onNavigate={onNavigate} />;
 }
 
-function RosterContents({
-  tournament,
-  canManage,
-  onAction,
-}: {
-  tournament: Tournament;
-  canManage: boolean;
-  onAction: (action: SetupAction) => void;
-}) {
+function LeagueTeams({ tournament, canManage, onAction }: Props) {
   const base = `/leagues/${tournament.leagueId}`;
   const path = tournamentPath(tournament.leagueId, tournament.id);
-  const teamsQuery = useSetupList<Team>(`${base}/teams`, canManage);
-  const playersQuery = useSetupList<Player>(`${base}/players`, canManage);
-  const enrolledQuery = useSetupList<Team>(`${path}/teams`);
-  const rosterQuery = useSetupList<Registration>(`${path}/players`);
-  const teams = teamsQuery.data?.pages.flatMap((page) => page.data) ?? [];
-  const players = playersQuery.data?.pages.flatMap((page) => page.data) ?? [];
-  const enrolled = enrolledQuery.data?.pages.flatMap((page) => page.data) ?? [];
-  const roster = rosterQuery.data?.pages.flatMap((page) => page.data) ?? [];
-  const [teamId, selectTeam] = useState<string>();
-  const [playerId, selectPlayer] = useState<string>();
-  const [enrolledId, selectEnrolled] = useState<string>();
-  const team = teams.find((item) => item.id === teamId);
-  const player = players.find((item) => item.id === playerId);
-  const currentTeam =
-    enrolled.find((item) => item.id === enrolledId) ?? enrolled[0];
   const draft = canManage && tournament.status === "draft";
+  const query = useSetupList<Team>(`${base}/teams`);
+  const enrolledQuery = useSetupList<Team>(`${path}/teams`, draft);
+  const teams = query.data?.pages.flatMap((page) => page.data) ?? [];
+  const enrolled = new Set(enrolledQuery.data?.pages.flatMap((page) => page.data.map(({ id }) => id)));
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const editTeam = (item?: Team) =>
     onAction({
+      description: item?.name,
       title: item ? "Edit team" : "Create team",
       method: item ? "patch" : "post",
       path: item ? `${base}/teams/${item.id}` : `${base}/teams`,
@@ -107,8 +78,56 @@ function RosterContents({
       }),
     });
 
+  return (
+    <View style={styles.list}>
+      <SectionHeading action="+ Add team" onPress={() => editTeam()}>League teams</SectionHeading>
+      {teams.map((team) => {
+        const expanded = expandedId === team.id;
+        const isEnrolled = enrolled.has(team.id);
+        return (
+          <Card key={team.id} style={styles.item}>
+            <DirectoryRow
+              name={team.name}
+              detail={isEnrolled ? `${team.code} · Enrolled` : team.code}
+              badge={<TeamBadge label={team.name} seed={team.id} />}
+              expanded={expanded}
+              onPress={() => setExpandedId(expanded ? null : team.id)}
+            />
+            {expanded ? (
+              <View style={styles.actions}>
+                {draft && !isEnrolled ? (
+                  <ActionButton size="compact" onPress={() => onAction({
+                    title: "Enroll team",
+                    description: `Add ${team.name} to ${tournament.name}.`,
+                    method: "put",
+                    path: `${path}/teams/${team.id}`,
+                    submitLabel: "Enroll team",
+                  })}>Enroll team</ActionButton>
+                ) : null}
+                <ActionButton size="compact" variant="secondary" onPress={() => editTeam(team)}>Edit team</ActionButton>
+              </View>
+            ) : null}
+          </Card>
+        );
+      })}
+      <PageState query={query} empty="No league teams yet." more="More teams" />
+    </View>
+  );
+}
+
+function LeaguePlayers({ tournament, canManage, onAction }: Props) {
+  const base = `/leagues/${tournament.leagueId}`;
+  const path = tournamentPath(tournament.leagueId, tournament.id);
+  const draft = canManage && tournament.status === "draft";
+  const query = useSetupList<Player>(`${base}/players`);
+  const enrolledQuery = useSetupList<Team>(`${path}/teams`, draft);
+  const players = query.data?.pages.flatMap((page) => page.data) ?? [];
+  const enrolled = enrolledQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   const editPlayer = (item?: Player) =>
     onAction({
+      description: item?.name,
       title: item ? "Edit player" : "Create player",
       method: item ? "patch" : "post",
       path: item ? `${base}/players/${item.id}` : `${base}/players`,
@@ -141,161 +160,231 @@ function RosterContents({
       }),
     });
 
-  const register = (id: string, existing?: Registration) =>
-    onAction({
-      title: existing ? "Change tournament assignment" : "Register player",
-      method: "put",
-      path: `${path}/players/${id}`,
-      fields: [
-        {
-          key: "teamId",
-          label: "Enrolled team",
-          choices: enrolled,
-          initial: existing?.teamId,
-        },
-      ],
-      body: ({ teamId }) => ({ teamId }),
-    });
-
   return (
-    <Card style={{ gap: 12 }}>
-      {canManage ? (
-        <>
-          <SectionHeading action="+ Team" onPress={() => editTeam()}>
-            League teams
-          </SectionHeading>
-          <PageState
-            query={teamsQuery}
-            empty="No league teams."
-            more="More teams"
-          />
-          <LeagueChips items={teams} selected={teamId} onSelect={selectTeam} />
-          {team ? (
-            <View style={{ gap: 8 }}>
-              <ActionButton variant="secondary" onPress={() => editTeam(team)}>
-                Edit team
-              </ActionButton>
-              {draft && !enrolled.some((item) => item.id === team.id) ? (
-                <ActionButton
-                  onPress={() =>
-                    onAction({
-                      title: "Enroll team",
-                      description: `Add ${team.name} to ${tournament.name}.`,
-                      method: "put",
-                      path: `${path}/teams/${team.id}`,
-                      submitLabel: "Enroll team",
-                    })
-                  }
-                >
-                  Enroll team
-                </ActionButton>
-              ) : null}
-            </View>
-          ) : null}
-          <SectionHeading action="+ Player" onPress={() => editPlayer()}>
-            League players
-          </SectionHeading>
-          <PageState
-            query={playersQuery}
-            empty="No league players."
-            more="More players"
-          />
-          <LeagueChips
-            items={players}
-            selected={playerId}
-            onSelect={selectPlayer}
-          />
-          {player ? (
-            <View style={{ gap: 8 }}>
-              <ActionButton
-                variant="secondary"
-                onPress={() => editPlayer(player)}
-              >
-                Edit player
-              </ActionButton>
-              {draft && enrolled.length ? (
-                <ActionButton
-                  onPress={() =>
-                    register(
-                      player.id,
-                      roster.find((item) => item.playerId === player.id),
-                    )
-                  }
-                >
-                  Assign to tournament team
-                </ActionButton>
-              ) : null}
-            </View>
-          ) : null}
-        </>
+    <View style={styles.list}>
+      <SectionHeading action="+ Add player" onPress={() => editPlayer()}>League players</SectionHeading>
+      {draft && enrolledQuery.error ? (
+        <QueryState error={enrolledQuery.error} retry={() => void enrolledQuery.refetch()} />
       ) : null}
-
-      <SectionHeading>Tournament roster</SectionHeading>
-      <PageState
-        query={enrolledQuery}
-        empty="No teams enrolled."
-        more="More enrolled teams"
-      />
-      <LeagueChips
-        items={enrolled}
-        selected={currentTeam?.id}
-        onSelect={selectEnrolled}
-      />
-      <PageState
-        query={rosterQuery}
-        empty="No players registered."
-        more="More registrations"
-      />
-      {currentTeam && draft ? (
-        <SectionHeading
-          action="Remove team"
-          onPress={() =>
-            onAction({
-              title: "Remove tournament team",
-              description: `Remove ${currentTeam.name} from ${tournament.name}. Teams with match or player records cannot be removed.`,
-              method: "delete",
-              path: `${path}/teams/${currentTeam.id}`,
-              submitLabel: "Remove team",
-            })
-          }
-        >
-          {currentTeam.name}
-        </SectionHeading>
-      ) : null}
-      {roster
-        .filter((item) => item.teamId === currentTeam?.id)
-        .map((item) => (
-          <View key={item.id}>
-            <Text style={shared.body}>
-              {item.name} · {item.role}
-              {item.isActive ? "" : " · Inactive"}
-            </Text>
-            {draft ? (
-              <SectionHeading
-                action="Remove"
-                onPress={() =>
-                  onAction({
-                    title: "Remove player registration",
-                    description: `Remove ${item.name} from this tournament. The league player profile will still be available.`,
-                    method: "delete",
-                    path: `${path}/players/${item.playerId}`,
-                    submitLabel: "Remove registration",
-                  })
-                }
-              >
-                Registration
-              </SectionHeading>
+      {players.map((player) => {
+        const expanded = expandedId === player.id;
+        return (
+          <Card key={player.id} style={styles.item}>
+            <DirectoryRow
+              name={player.name}
+              detail={`${roleLabel(player.role)}${player.age ? ` · Age ${player.age}` : ""}`}
+              expanded={expanded}
+              onPress={() => setExpandedId(expanded ? null : player.id)}
+            />
+            {expanded ? (
+              <View style={styles.actions}>
+                {draft && enrolled.length ? (
+                  <ActionButton size="compact" onPress={() => onAction(assignment(path, player, enrolled))}>
+                    Set tournament team
+                  </ActionButton>
+                ) : null}
+                <ActionButton size="compact" variant="secondary" onPress={() => editPlayer(player)}>Edit player</ActionButton>
+              </View>
             ) : null}
-          </View>
-        ))}
-      {canManage && !draft ? (
-        <Text style={shared.body}>
-          Tournament roster changes are available in draft tournaments.
-        </Text>
+          </Card>
+        );
+      })}
+      <PageState query={query} empty="No league players yet." more="More players" />
+      {draft && enrolledQuery.hasNextPage ? (
+        <ActionButton variant="secondary" loading={enrolledQuery.isFetchingNextPage} onPress={() => void enrolledQuery.fetchNextPage()}>
+          Load more team choices
+        </ActionButton>
       ) : null}
-    </Card>
+    </View>
   );
 }
+
+function assignment(path: string, player: Player, teams: Team[], current?: Registration): SetupAction {
+  return {
+    title: current ? "Change tournament assignment" : "Set tournament team",
+    description: current ? player.name : `Choose a team for ${player.name}. This replaces any existing assignment in this tournament.`,
+    method: "put",
+    path: `${path}/players/${current?.playerId ?? player.id}`,
+    fields: [{ key: "teamId", label: "Enrolled team", choices: teams, initial: current?.teamId }],
+    body: ({ teamId }) => ({ teamId }),
+  };
+}
+
+function TournamentRoster({ tournament, canManage, onAction, onNavigate }: Props & { onNavigate: () => void }) {
+  const path = tournamentPath(tournament.leagueId, tournament.id);
+  const teamsQuery = useSetupList<Team>(`${path}/teams`);
+  const teams = teamsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const [teamId, selectTeam] = useState<string | null>(null);
+  const openTeam = (id: string | null) => {
+    selectTeam(id);
+    onNavigate();
+  };
+  const current = teams.find((team) => team.id === teamId);
+  const editable = canManage && tournament.status === "draft";
+
+  if (current) {
+    return (
+      <TeamRoster
+        key={current.id}
+        path={path}
+        tournamentName={tournament.name}
+        team={current}
+        teams={teams}
+        editable={editable}
+        onAction={onAction}
+        onBack={() => openTeam(null)}
+        hasMoreTeams={teamsQuery.hasNextPage}
+        loadingTeams={teamsQuery.isFetchingNextPage}
+        onMoreTeams={() => void teamsQuery.fetchNextPage()}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.list}>
+      <SectionHeading>Tournament teams</SectionHeading>
+      {teams.map((team) => (
+        <Card key={team.id} style={styles.item}>
+          <DirectoryRow name={team.name} detail={team.code} badge={<TeamBadge label={team.name} seed={team.id} />} onPress={() => openTeam(team.id)} />
+        </Card>
+      ))}
+      <PageState
+        query={teamsQuery}
+        empty={editable ? "No teams enrolled. Enroll a team from League teams." : "No teams enrolled."}
+        more="More enrolled teams"
+      />
+    </View>
+  );
+}
+
+function TeamRoster({ path, tournamentName, team, teams, editable, onAction, onBack, hasMoreTeams, loadingTeams, onMoreTeams }: {
+  path: string;
+  tournamentName: string;
+  team: Team;
+  teams: Team[];
+  editable: boolean;
+  onAction: (action: SetupAction) => void;
+  onBack: () => void;
+  hasMoreTeams: boolean;
+  loadingTeams: boolean;
+  onMoreTeams: () => void;
+}) {
+  const query = useSetupList<Registration>(`${path}/players`);
+  const roster = query.data?.pages.flatMap((page) => page.data).filter((player) => player.teamId === team.id) ?? [];
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  return (
+    <View style={styles.list}>
+      <Pressable accessibilityRole="button" onPress={onBack} style={styles.back}>
+        <ArrowLeft size={18} color={theme.colors.accent} />
+        <Text style={styles.backText}>Tournament teams</Text>
+      </Pressable>
+      <Card style={styles.teamHeader}>
+        <TeamBadge label={team.name} seed={team.id} />
+        <View style={styles.copy}>
+          <Text accessibilityRole="header" style={shared.cardTitle}>{team.name}</Text>
+          <Text style={shared.body}>{team.code} · {tournamentName}</Text>
+        </View>
+      </Card>
+      <SectionHeading>Registered players</SectionHeading>
+      {query.data && !roster.length && !query.error ? (
+        <EmptyCard description={query.hasNextPage ? "No players for this team on the loaded pages." : editable ? "No players registered. Assign a player from Players." : "No players registered for this team."} />
+      ) : null}
+      {roster.map((player) => {
+        const expanded = player.id === expandedId;
+        return (
+          <Card key={player.id} style={styles.item}>
+            <DirectoryRow
+              name={player.name}
+              detail={`${roleLabel(player.role)}${player.isActive ? "" : " · Inactive"}`}
+              expanded={editable ? expanded : undefined}
+              onPress={editable ? () => setExpandedId(expanded ? null : player.id) : undefined}
+            />
+            {editable && expanded ? (
+              <View style={styles.actions}>
+                {teams.length > 1 ? (
+                  <ActionButton size="compact" variant="secondary" onPress={() => onAction(assignment(path, player, teams, player))}>
+                    Change team
+                  </ActionButton>
+                ) : null}
+                <ActionButton size="compact" variant="danger" onPress={() => onAction({
+                  title: "Remove player registration",
+                  description: `Remove ${player.name} from this tournament. The league player profile will still be available.`,
+                  method: "delete",
+                  path: `${path}/players/${player.playerId}`,
+                  submitLabel: "Remove registration",
+                })}>Remove registration</ActionButton>
+              </View>
+            ) : null}
+          </Card>
+        );
+      })}
+      <PageState query={query} more="More registrations" />
+      {editable && hasMoreTeams ? (
+        <ActionButton variant="secondary" loading={loadingTeams} onPress={onMoreTeams}>Load more team choices</ActionButton>
+      ) : null}
+      {editable ? (
+        <ActionButton variant="danger" size="compact" onPress={() => onAction({
+          title: "Remove tournament team",
+          description: `Remove ${team.name} from ${tournamentName}. Teams with match or player records cannot be removed.`,
+          method: "delete",
+          path: `${path}/teams/${team.id}`,
+          submitLabel: "Remove team",
+        })}>Remove team from tournament</ActionButton>
+      ) : null}
+    </View>
+  );
+}
+
+function roleLabel(role: string) {
+  return cricketRoles.find((item) => item.id === role)?.name ?? role;
+}
+
+function DirectoryRow({ name, detail, badge, expanded, onPress }: {
+  name: string;
+  detail: string;
+  badge?: ReactNode;
+  expanded?: boolean;
+  onPress?: () => void;
+}) {
+  const content = (
+    <>
+      {badge}
+      <View style={styles.copy}>
+        <Text style={styles.name}>{name}</Text>
+        <Text style={shared.body}>{detail}</Text>
+      </View>
+      {onPress ? expanded === undefined
+        ? <ChevronRight size={18} color={theme.colors.textMuted} />
+        : <ChevronDown size={18} color={theme.colors.textMuted} style={expanded ? styles.flipped : undefined} />
+        : null}
+    </>
+  );
+  if (!onPress) return <View style={styles.row}>{content}</View>;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={expanded === undefined ? undefined : { expanded }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+    >
+      {content}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  list: { gap: 10 },
+  item: { padding: 0 },
+  row: { minHeight: 62, flexDirection: "row", alignItems: "center", gap: 12, padding: 12 },
+  copy: { flex: 1, minWidth: 0, gap: 2 },
+  name: { color: theme.colors.text, fontFamily: theme.fonts.label, fontSize: 17 },
+  pressed: { opacity: 0.85 },
+  flipped: { transform: [{ rotate: "180deg" }] },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 12, paddingBottom: 12 },
+  teamHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  back: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", minHeight: 44, gap: 8 },
+  backText: { color: theme.colors.accent, fontFamily: theme.fonts.label, fontSize: 15 },
+});
 
 export function PageState({
   query,
@@ -311,12 +400,12 @@ export function PageState({
     fetchNextPage: () => Promise<unknown>;
     refetch: () => Promise<unknown>;
   };
-  empty: string;
+  empty?: string;
   more: string;
 }) {
   return (
     <>
-      {query.error || !query.data?.pages.some((page) => page.data.length) ? (
+      {query.error || !query.data || (empty && !query.data.pages.some((page) => page.data.length)) ? (
         <QueryState
           loading={!query.data && query.isFetching}
           error={query.error}

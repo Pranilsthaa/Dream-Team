@@ -16,8 +16,10 @@ import {
   useEffect,
   useRef,
   useState,
+  type ComponentRef,
   type ComponentType,
   type ReactNode,
+  type Ref,
 } from "react";
 import {
   Pressable,
@@ -168,10 +170,12 @@ export function useMatchCentre(): MatchCentreContextValue {
 export function MatchCentreTabScroll({
   refreshing = false,
   onRefresh,
+  scrollRef,
   children,
 }: {
   refreshing?: boolean;
   onRefresh?: () => void;
+  scrollRef?: Ref<ComponentRef<typeof ScrollView>>;
   children: (tournament: Tournament) => ReactNode;
 }) {
   const {
@@ -188,6 +192,7 @@ export function MatchCentreTabScroll({
   if (!tournament) {
     return (
       <ScrollView
+        ref={scrollRef}
         style={shared.screen}
         contentContainerStyle={[
           styles.scrollContent,
@@ -202,11 +207,7 @@ export function MatchCentreTabScroll({
         }
       >
         <View style={styles.container}>
-          <PageHeader
-            title="Match Centre"
-            subtitle={league.name}
-            wide={wide}
-          />
+          <PageHeader title="Match Centre" subtitle={league.name} wide={wide} />
           {tournamentsError || tournamentsLoading ? (
             <QueryState
               loading={tournamentsLoading}
@@ -237,6 +238,7 @@ export function MatchCentreTabScroll({
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={shared.screen}
       contentContainerStyle={[
         styles.scrollContent,
@@ -450,7 +452,11 @@ function LeagueTabsLayout({
               <RoleBadge role={role} />
               <ChevronDown size={20} color={theme.colors.textMuted} />
             </Pressable>
-            <ActionButton size="compact" variant="secondary" onPress={handleSwitchToFantasy}>
+            <ActionButton
+              size="compact"
+              variant="secondary"
+              onPress={handleSwitchToFantasy}
+            >
               Fantasy
             </ActionButton>
           </View>
@@ -463,7 +469,6 @@ function LeagueTabsLayout({
             sceneStyle: { backgroundColor: theme.colors.background },
             tabBarActiveTintColor: theme.colors.accent,
             tabBarInactiveTintColor: theme.colors.textMuted,
-            tabBarActiveBackgroundColor: theme.colors.surface,
             tabBarStyle: {
               backgroundColor: theme.colors.deep,
               borderTopWidth: 2,
@@ -490,9 +495,7 @@ function LeagueTabsLayout({
                 title: label,
                 tabBarIcon: ({ color }) => {
                   const tint =
-                    typeof color === "string"
-                      ? color
-                      : theme.colors.textMuted;
+                    typeof color === "string" ? color : theme.colors.textMuted;
                   if (route === "match-day") {
                     return (
                       <View style={styles.iconWrap}>
@@ -600,7 +603,6 @@ function LeagueTabsLayout({
                   More tournaments
                 </ActionButton>
               ) : null}
-
             </View>
           ) : shellSheet === "create-tournament" ? (
             <LeagueForm
