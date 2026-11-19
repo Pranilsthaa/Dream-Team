@@ -24,12 +24,14 @@ export function RosterPanel({
   tournament,
   canManage,
   onAction,
+  defaultExpanded = false,
 }: {
   tournament: Tournament;
   canManage: boolean;
   onAction: (action: SetupAction) => void;
+  defaultExpanded?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   return (
     <>
       <SectionHeading

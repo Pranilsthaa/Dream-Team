@@ -110,11 +110,11 @@ export function scorecardPath(leagueId: string, tournamentId: string, fixtureId:
   return `${tournamentPath(leagueId, tournamentId)}/schedule/fixtures/${fixtureId}/scorecard`;
 }
 
-export function useStaffScorecard(path: string) {
+export function useStaffScorecard(path: string, enabled = true) {
   const { session } = useAuth();
   return useQuery({
     queryKey: ["lineup-status", session.user?.id, path],
-    enabled: session.status === "signed-in",
+    enabled: enabled && session.status === "signed-in",
     staleTime: 0,
     networkMode: "always",
     queryFn: async ({ signal }) => {

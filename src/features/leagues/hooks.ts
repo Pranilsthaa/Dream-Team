@@ -8,6 +8,11 @@ export const useLeagueSelection = create<{
   select: (id: string) => void;
 }>((set) => ({ id: null, select: (id) => set({ id }) }));
 
+export const useTournamentSelection = create<{
+  id: string | null;
+  select: (id: string | null) => void;
+}>((set) => ({ id: null, select: (id) => set({ id }) }));
+
 export function useLeagues() {
   const { session } = useAuth();
   return useInfiniteQuery({
@@ -42,6 +47,19 @@ export function useTournaments(leagueId?: string) {
       last.data.length === last.pageSize ? last.page + 1 : undefined,
     enabled: Boolean(leagueId) && session.status === "signed-in",
   });
+}
+export function useSelectedTournament(leagueId?: string) {
+  const query = useTournaments(leagueId);
+  const id = useTournamentSelection((state) => state.id);
+  const select = useTournamentSelection((state) => state.select);
+  const tournaments = query.data?.pages.flatMap((page) => page.data) ?? [];
+  return {
+    query,
+    tournaments,
+    tournament:
+      tournaments.find((tournament) => tournament.id === id) ?? tournaments[0],
+    select,
+  };
 }
 export function useMatches() {
   return useQuery({
